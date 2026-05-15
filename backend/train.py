@@ -92,6 +92,28 @@ PROFILES = {
         "n_lgbm": 10,
         "n_catboost": 10,
     },
+    "9": {
+        "name": "RL Training — PPO full (1 000 000 timesteps)",
+        "description": (
+            "Requires trained LightGBM + CatBoost (run profile 1 or 5 first)\n"
+            "  8-dim compact obs · 4 parallel envs · MlpPolicy [64,64]\n"
+            "  Exit criterion: Sharpe > 1.0 · max drawdown < 20% on val set\n"
+            "  Training time: 30–90 min (CPU)"
+        ),
+        "tickers": None,
+        "mode": "rl",
+        "total_timesteps": 1_000_000,
+    },
+    "10": {
+        "name": "RL Training — PPO quick test (50 000 timesteps)",
+        "description": (
+            "Fast sanity check — verifies env + training loop work correctly\n"
+            "  Training time: ~2-5 min"
+        ),
+        "tickers": None,
+        "mode": "rl",
+        "total_timesteps": 50_000,
+    },
 }
 
 
@@ -115,7 +137,7 @@ def pick_profile() -> dict | None:
             return None
         if choice in PROFILES:
             return PROFILES[choice]
-        print("  Invalid choice — enter 1–8 or q.")
+        print("  Invalid choice — enter 1–10 or q.")
 
 
 def _apply_rolling_window(features):
@@ -261,8 +283,21 @@ def main():
     if tickers:
         print(f"  Tickers : {tickers}")
     else:
-        print("  Tickers : all 15")
+        print("  Tickers : all (equity universe)")
     print()
+
+    mode = profile["mode"]
+
+    # RL mode: features already built inside train_rl (no rolling window — needs full history)
+    if mode == "rl":
+        from rl.train_rl import train_rl
+        from data.feature_engineering import build_features
+        print("Building features...")
+        features = build_features()
+        train_rl(features, total_timesteps=profile["total_timesteps"])
+        print("\n  RL training complete. PPO checkpoint saved to models/checkpoints/ppo_agent.zip")
+        print("  The paper trading pipeline will use the PPO agent automatically from now on.\n")
+        return
 
     from data.feature_engineering import build_features
     print("Building features...")
@@ -271,8 +306,6 @@ def main():
     if tickers:
         features = features[features["ticker"].isin(tickers)]
         print(f"  Filtered to {len(features):,} rows\n")
-
-    mode = profile["mode"]
 
     # Apply rolling window to focus training on recent regime (skipped for TFT — needs sequences)
     if mode in ("lgbm", "catboost", "compare"):

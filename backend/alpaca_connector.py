@@ -120,20 +120,39 @@ class AlpacaConnector:
         else:
             logger.warning("[STUB] Would liquidate all positions")
 
+    def _get_portfolio_state(self, portfolio: dict) -> tuple[float, float]:
+        """Returns (current_position_pct, episode_drawdown) for RL obs."""
+        current_value = portfolio.get("total_value", self._start_value)
+        episode_drawdown = max(0.0, 1.0 - current_value / self._start_value)
+        # Approximate current position as total notional / portfolio value
+        positions = portfolio.get("positions", [])
+        if not positions:
+            return 0.0, episode_drawdown
+        notional = sum(abs(p.get("market_value", 0)) for p in positions)
+        position_pct = (notional / max(current_value, 1)) * 100.0
+        return position_pct, episode_drawdown
+
     def run_inference_and_trade(self, features) -> dict:
         """Called by scheduler after features are built. Returns the signal dict."""
-        logger.info("Running multi-horizon inference pipeline...")
+        logger.info("Running inference pipeline...")
         try:
-            from models.strategy_scorer import MultiHorizonScorer
+            from models.rl_scorer import RLScorer
             from risk_manager import RiskManager
 
-            scorer = MultiHorizonScorer().load()
+            portfolio = self.get_portfolio()
+            current_pos_pct, ep_drawdown = self._get_portfolio_state(portfolio)
+
+            # Use RL scorer (which internally wraps MultiHorizonScorer).
+            # Falls back to base scorer automatically if no PPO checkpoint exists.
+            scorer = RLScorer().load()
             if not scorer.is_ready:
-                logger.warning("No trained TFT model found — skipping inference")
+                logger.warning("No trained models found — skipping inference")
                 return {}
 
-            result = scorer.score(features)
-            portfolio = self.get_portfolio()
+            result = scorer.score(features,
+                                  current_position_pct=current_pos_pct,
+                                  episode_drawdown=ep_drawdown)
+            logger.info(f"Using {'RL+supervised' if scorer.rl_active else 'supervised-only'} scorer")
 
             risk = RiskManager()
             score, position_pct, should_trade = risk.validate_order(
