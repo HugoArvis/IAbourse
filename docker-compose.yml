@@ -4,7 +4,7 @@ services:
     image: trading-ai:latest
     container_name: trading-ai
     ports:
-      - "8000:8000"
+      - "2267:8000"
     env_file:
       - backend/.env
     volumes:
