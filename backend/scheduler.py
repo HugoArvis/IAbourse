@@ -26,10 +26,13 @@ def _daily_job():
         # (model must already be trained and loaded)
         from alpaca_connector import AlpacaConnector
         import main as _main  # update shared state so WebSocket picks it up
+        from datetime import datetime, timezone
         connector = AlpacaConnector()
         result = connector.run_inference_and_trade(features)
         if result:
+            result["timestamp"] = datetime.now(timezone.utc).isoformat()
             _main._state["last_signal"] = result
+            _main._save_signal(result)
     except Exception as e:
         logger.error(f"Daily job failed: {e}")
 
@@ -73,7 +76,10 @@ class TradingScheduler:
             minute=SCHEDULE_MINUTE,
             timezone=SCHEDULE_TIMEZONE,
         )
-        self._scheduler.add_job(_daily_job, trigger, id="daily_trade", replace_existing=True)
+        self._scheduler.add_job(
+            _daily_job, trigger, id="daily_trade", replace_existing=True,
+            misfire_grace_time=300, coalesce=True,
+        )
 
         retrain_trigger = CronTrigger(
             day_of_week=RETRAIN_DAY_OF_WEEK,
@@ -81,7 +87,10 @@ class TradingScheduler:
             minute=RETRAIN_MINUTE,
             timezone=SCHEDULE_TIMEZONE,
         )
-        self._scheduler.add_job(_weekly_retrain_job, retrain_trigger, id="weekly_retrain", replace_existing=True)
+        self._scheduler.add_job(
+            _weekly_retrain_job, retrain_trigger, id="weekly_retrain", replace_existing=True,
+            misfire_grace_time=3600, coalesce=True,
+        )
 
         self._scheduler.start()
         self._running = True

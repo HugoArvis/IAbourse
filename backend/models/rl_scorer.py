@@ -16,7 +16,8 @@ class RLScorer:
     Falls back gracefully to MultiHorizonScorer if no PPO checkpoint exists.
     """
 
-    _CKPT = os.path.join(MODEL_DIR, "checkpoints", "ppo_agent.zip")
+    _CKPT      = os.path.join(MODEL_DIR, "ppo_agent.zip")
+    _CKPT_BEST = os.path.join(MODEL_DIR, "best_model.zip")
 
     def __init__(self):
         self._ppo   = None
@@ -26,14 +27,16 @@ class RLScorer:
         from models.strategy_scorer import MultiHorizonScorer
         self._base = MultiHorizonScorer().load()
 
-        if not os.path.exists(self._CKPT):
+        ckpt = self._CKPT if os.path.exists(self._CKPT) else (
+               self._CKPT_BEST if os.path.exists(self._CKPT_BEST) else None)
+        if ckpt is None:
             logger.info("No PPO checkpoint found — RLScorer will use base scorer only")
             return self
 
         try:
             from stable_baselines3 import PPO
-            self._ppo = PPO.load(self._CKPT)
-            logger.info(f"PPO agent loaded from {self._CKPT}")
+            self._ppo = PPO.load(ckpt)
+            logger.info(f"PPO agent loaded from {ckpt}")
         except Exception as e:
             logger.error(f"Failed to load PPO model: {e}")
             self._ppo = None

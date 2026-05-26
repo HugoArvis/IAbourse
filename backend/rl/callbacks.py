@@ -1,3 +1,4 @@
+import os
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -10,7 +11,7 @@ def build_callbacks(make_env_fn, log_path: str = "models/eval_logs/"):
 
     eval_cb = EvalCallback(
         eval_env,
-        best_model_save_path="models/checkpoints/",
+        best_model_save_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "checkpoints"),
         log_path=log_path,
         eval_freq=20_000,
         n_eval_episodes=10,

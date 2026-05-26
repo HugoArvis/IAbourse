@@ -23,13 +23,13 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv
 from config import (
     PPO_LR, PPO_N_STEPS, PPO_BATCH_SIZE, PPO_N_EPOCHS,
     PPO_GAMMA, PPO_GAE_LAMBDA, PPO_CLIP_RANGE, PPO_ENT_COEF,
     PPO_TOTAL_TIMESTEPS, MODEL_DIR,
 )
-from data.feature_engineering import FEATURE_COLUMNS
+from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
 from rl.trading_env import TradingEnv, EPISODE_LENGTH
 from rl.callbacks import build_callbacks
 from rl.reward_functions import _episode_sharpe
@@ -60,7 +60,10 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
                 f"val {train_cut.date()} → {val_cut.date()} ({len(val_df):,} rows)")
 
     def _add_preds(df: pd.DataFrame) -> pd.DataFrame:
-        X = df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
+        X = df[FEATURE_COLUMNS].fillna(0)
+        for c in CATEGORICAL_FEATURES:
+            if c in X.columns:
+                X[c] = X[c].astype(int)
         df = df.copy()
         df["pred_21d"] = lgbm21._model.predict(X)
         df["pred_5d"]  = cb5._model.predict(X) if cb5 else np.zeros(len(df))
@@ -115,16 +118,15 @@ def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
 def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS) -> PPO:
     os.makedirs(MODEL_DIR, exist_ok=True)
 
+    print("  Preparing RL data (pre-computing model predictions)...")
     train_dict, val_dict = prepare_rl_data(features)
+    print(f"  Train tickers: {len(train_dict)}  |  Val tickers: {len(val_dict)}")
 
-    def make_env():
-        return TradingEnv(train_dict)
-
-    # 4 parallel envs for faster training (SubprocVecEnv on multi-core machines)
-    try:
-        env = SubprocVecEnv([make_env] * 4)
-    except Exception:
-        env = DummyVecEnv([make_env] * 4)
+    # DummyVecEnv: works on all platforms (SubprocVecEnv deadlocks on Windows
+    # because closure-captured DataFrames can't be pickled across spawn processes)
+    n_envs = 4
+    env = DummyVecEnv([lambda: TradingEnv(train_dict)] * n_envs)
+    print(f"  Vectorized environment ready ({n_envs} envs, DummyVecEnv)")
 
     model = PPO(
         policy="MlpPolicy",
@@ -137,17 +139,19 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
         gae_lambda=PPO_GAE_LAMBDA,
         clip_range=PPO_CLIP_RANGE,
         ent_coef=PPO_ENT_COEF,
-        policy_kwargs={"net_arch": [64, 64]},  # small MLP — obs is only 8-dim
+        policy_kwargs={"net_arch": [64, 64]},
         verbose=1,
     )
 
-    callbacks = build_callbacks(make_env)
+    callbacks = build_callbacks(lambda: TradingEnv(val_dict))
 
+    print(f"\n  Starting PPO training ({total_timesteps:,} timesteps)...")
+    print("  Training stats will appear every ~2 048 steps\n")
     logger.info(f"PPO training: {total_timesteps:,} timesteps · {len(train_dict)} tickers")
     model.learn(total_timesteps=total_timesteps, callback=callbacks, progress_bar=True)
 
     # Save
-    save_path = os.path.join(MODEL_DIR, "checkpoints", "ppo_agent")
+    save_path = os.path.join(MODEL_DIR, "ppo_agent")
     model.save(save_path)
     logger.info(f"PPO model saved → {save_path}.zip")
 

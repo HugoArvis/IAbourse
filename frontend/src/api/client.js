@@ -25,4 +25,6 @@ export const api = {
       body: JSON.stringify({ confirm: true }),
     }),
   runNow: () => request("/model/run-now", { method: "POST" }),
+  getPrices: (ticker = "AAPL", days = 90) => request(`/prices/${ticker}?days=${days}`),
+  getPortfolioHistory: () => request("/portfolio/history"),
 };

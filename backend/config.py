@@ -107,22 +107,54 @@ PPO_ENT_COEF = 0.01
 PPO_TOTAL_TIMESTEPS = 1_000_000
 
 # Risk rules
-MAX_PORTFOLIO_DRAWDOWN = 0.20   # 20% stop-loss
-MAX_POSITION_PCT = 0.20         # 20% per ticker
-CONFIDENCE_THRESHOLD = 0.55     # below → no trade
+MAX_PORTFOLIO_DRAWDOWN = 0.20   # 20% stop-loss (hard limit — never bypass)
+MAX_POSITION_PCT = 1.0          # 100% per ticker — paper trading, model decides sizing
+CONFIDENCE_THRESHOLD = 0.05     # very low: trade on any meaningful signal
 MIN_AVG_VOLUME = 1_000_000      # shares/day
 EARNINGS_BLACKOUT_HOURS = 24    # hours before earnings
 DRAWDOWN_PENALTY_THRESHOLD = 0.15
+MAX_OPEN_POSITIONS = 5          # max simultaneous long positions across all tickers
+MAX_PER_SECTOR = 2              # max tickers from the same sector in the portfolio
+STOP_LOSS_PCT = -0.08           # -8% unrealized loss → close position immediately
 
 # Score / position formula constants
 SCORE_NEUTRAL = 5.0
 
-# Multi-horizon weights (regime-adaptive; strategy_scorer.py adjusts dynamically)
-HORIZON_WEIGHTS = {"weekly": 0.10, "monthly": 0.90}  # 5d near-random on recent data → 21d dominates
+# Multi-horizon weights — 5d suppressed (direction accuracy ~50%, near-random)
+HORIZON_WEIGHTS = {"weekly": 0.0, "monthly": 1.0}
 
 # Regression scoring: predicted alpha at which position reaches ±100%
 # e.g. 0.03 → a +3% predicted 21d alpha vs SP500 = full long position
-MAX_PREDICTED_RETURN = 0.03
+MAX_PREDICTED_RETURN = 0.015
+
+# Sector classification for concentration constraint (covers all 63 EQUITY_TICKERS)
+SECTOR_MAP = {
+    # Technology (16)
+    "AAPL": "tech", "MSFT": "tech", "GOOGL": "tech", "AMZN": "tech", "META": "tech",
+    "NVDA": "tech", "AMD": "tech", "AVGO": "tech", "QCOM": "tech", "CRM": "tech",
+    "ADBE": "tech", "ORCL": "tech", "CSCO": "tech", "TXN": "tech", "NOW": "tech", "INTC": "tech",
+    # Healthcare (9)
+    "JNJ": "healthcare", "UNH": "healthcare", "LLY": "healthcare", "ABBV": "healthcare",
+    "MRK": "healthcare", "PFE": "healthcare", "ABT": "healthcare", "CVS": "healthcare", "MDT": "healthcare",
+    # Financials (10)
+    "JPM": "financials", "V": "financials", "MA": "financials", "BAC": "financials",
+    "GS": "financials", "WFC": "financials", "BRK-B": "financials", "AXP": "financials",
+    "MS": "financials", "BLK": "financials",
+    # Consumer Discretionary (7)
+    "TSLA": "consumer_disc", "HD": "consumer_disc", "MCD": "consumer_disc",
+    "NKE": "consumer_disc", "SBUX": "consumer_disc", "BKNG": "consumer_disc", "TJX": "consumer_disc",
+    # Consumer Staples (6)
+    "PG": "consumer_staples", "KO": "consumer_staples", "PEP": "consumer_staples",
+    "WMT": "consumer_staples", "COST": "consumer_staples", "CL": "consumer_staples",
+    # Energy (4)
+    "XOM": "energy", "CVX": "energy", "COP": "energy", "EOG": "energy",
+    # Industrials (5)
+    "BA": "industrials", "HON": "industrials", "CAT": "industrials", "RTX": "industrials", "UPS": "industrials",
+    # Communications (4)
+    "DIS": "communications", "NFLX": "communications", "CMCSA": "communications", "VZ": "communications",
+    # Materials / Utilities (2)
+    "LIN": "materials", "NEE": "utilities",
+}
 
 # Temporal sample weighting — exponential decay half-life in days
 # Recent data weighted ~1.0; data HALF_LIFE days ago weighted ~0.5
