@@ -1,0 +1,20 @@
+# Python
+backend/.venv
+**/__pycache__
+*.pyc
+*.pyo
+
+# Frontend build artifacts and deps
+frontend/node_modules
+frontend/dist
+
+# Secrets — never bake into image
+backend/.env
+
+# Data cache — mounted as volume at runtime
+backend/data/cache/
+
+# Git + IDE
+.git
+.gitignore
+.vscode

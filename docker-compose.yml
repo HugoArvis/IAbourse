@@ -1,0 +1,20 @@
+services:
+  trading-ai:
+    build: .
+    image: trading-ai:latest
+    container_name: trading-ai
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    volumes:
+      # Persistent data: price cache + sentiment parquet files
+      - ./backend/data:/app/backend/data
+      # Persistent models: LightGBM, CatBoost, PPO checkpoints
+      - ./backend/models/checkpoints:/app/backend/models/checkpoints
+      # MLflow experiment tracking
+      - mlruns:/app/backend/mlruns
+    restart: unless-stopped
+
+volumes:
+  mlruns:
