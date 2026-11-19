@@ -295,6 +295,18 @@ if confidence < 0.55:
 
 ---
 
+## Git Workflow (mandatory)
+
+- `main`: stable releases only. Never commit or push directly to `main`.
+- `dev`: integration branch. Never commit directly to `dev` either.
+- Every feature or fix gets its own branch created from `dev`:
+  `feature/<short-name>` or `fix/<short-name>`.
+- Feature branches are merged into `dev` through a Pull Request.
+- When `dev` reaches a good, tested state, open a PR `dev` → `main` for the release.
+- Never force-push to `main` or `dev`. Never rewrite their history.
+
+---
+
 ## Local Dev — Start Commands
 
 ```bash
