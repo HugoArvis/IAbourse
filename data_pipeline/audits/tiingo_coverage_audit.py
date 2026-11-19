@@ -67,6 +67,48 @@ def main() -> None:
         print(partial.sort_values("gap_start_days", ascending=False)
               [["ticker", "first", "last", "t_start", "t_end"]].head(12).to_string(index=False))
 
+    print_coverage_by_year(span)
+
+
+def print_coverage_by_year(span: pd.DataFrame) -> None:
+    """Share of index members with usable Tiingo prices at each year-end.
+
+    A member counts as covered at date d if Tiingo has data on d and the Tiingo
+    history starts before the member joined the index (otherwise the ticker was
+    most likely reused by another company).
+    """
+    hans = load_hanshof()
+    hist = ic.history("sp500")
+    first_h = hans.explode().rename("ticker").reset_index().groupby("ticker")["date"].min()
+    slack = pd.Timedelta(days=7)
+
+    def covered(ticker: str, joined: pd.Timestamp, day: pd.Timestamp) -> bool:
+        key = ticker.upper().replace(".", "-")
+        if key not in span.index:
+            return False
+        s, e = span.loc[key, "t_start"], span.loc[key, "t_end"]
+        return s <= max(joined, pd.Timestamp("1996-01-01")) + slack and s <= day <= e
+
+    rows = []
+    for year in range(1996, pd.Timestamp.today().year + 1):
+        day = min(pd.Timestamp(f"{year}-12-31"), pd.Timestamp.today().normalize() - pd.Timedelta(days=3))
+        row = {"year": year}
+        if day - pd.Timedelta(days=365) <= hans.index.max():
+            d = hans.index[hans.index <= day].max()
+            members = hans[d]
+            row["hanshof_n"] = len(members)
+            row["hanshof_cov"] = sum(covered(t, first_h[t], d) for t in members) / len(members)
+        active = hist[(hist["opt-in"] <= day) & (hist["opt-out"].isna() | (hist["opt-out"] > day))]
+        row["ic_n"] = len(active)
+        row["ic_cov"] = sum(covered(t, j, day) for t, j in zip(active["symbol"], active["opt-in"])) / len(active)
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    for col in ("hanshof_cov", "ic_cov"):
+        out[col] = out[col].map(lambda v: f"{v:.1%}" if pd.notna(v) else "-")
+    out["hanshof_n"] = out["hanshof_n"].map(lambda v: f"{v:.0f}" if pd.notna(v) else "-")
+    print("\n== share of members with usable Tiingo prices at year-end")
+    print(out.to_string(index=False))
+
 
 if __name__ == "__main__":
     main()
