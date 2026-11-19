@@ -8,61 +8,18 @@ Prerequisites (cached by membership/ modules):
 Usage: python data_pipeline/audits/membership_vs_vanguard.py
 """
 
-import json
 import sys
 from pathlib import Path
 
-import index_constitution as ic
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "audits"))
 
-from membership.entity_match import match_names  # noqa: E402
-from membership_audit import ic_members_at, load_hanshof  # noqa: E402
-from sources import sec  # noqa: E402
+from membership.tickers import ic_with_cik, key, ticker_to_cik  # noqa: E402
+from membership.wiki_sources import hanshof_ticker_periods, ic_members_at, load_hanshof  # noqa: E402
 
 CACHE = ROOT / "cache"
-
-
-def _key(ticker: str) -> str:
-    return ticker.upper().replace("-", ".")
-
-
-def sec_current_tickers() -> dict[str, int]:
-    current = json.loads(sec.get("https://www.sec.gov/files/company_tickers.json"))
-    return {_key(r["ticker"]): int(r["cik_str"]) for r in current.values()}
-
-
-def ic_with_cik() -> pd.DataFrame:
-    """index-constitution history with a CIK per row.
-
-    Current members: official SEC ticker -> CIK. Former members (ticker possibly
-    reused since): name matching restricted to their membership period.
-    """
-    hist = ic.history("sp500").copy()
-    current = sec_current_tickers()
-    active = hist["opt-out"].isna()
-    hist["cik"] = hist["symbol"].map(lambda s: current.get(_key(s))).where(active)
-    todo = hist[hist["cik"].isna()]
-    names = pd.DataFrame({
-        "name": todo["name"],
-        "first_seen": todo["opt-in"].clip(lower=pd.Timestamp("1994-01-01")),
-        "last_seen": todo["opt-out"].fillna(pd.Timestamp.today().normalize()),
-    }).drop_duplicates("name")
-    by_name = match_names(names).set_index("name")["cik"]
-    hist.loc[hist["cik"].isna(), "cik"] = todo["name"].map(by_name)
-    return hist
-
-
-def ticker_to_cik(ic_hist: pd.DataFrame) -> dict[str, int]:
-    """Ticker -> CIK: SEC current tickers, overridden by index-constitution's former members."""
-    mapping = sec_current_tickers()
-    former = ic_hist[ic_hist["opt-out"].notna() & ic_hist["cik"].notna()]
-    for sym, cik in zip(former["symbol"], former["cik"]):
-        mapping.setdefault(_key(sym), int(cik))  # don't override a current listing
-    return mapping
 
 
 def main() -> None:
@@ -71,7 +28,7 @@ def main() -> None:
     snaps = snaps.merge(names, on="name", how="left")
     hans = load_hanshof()
     ic_hist = ic_with_cik()
-    t2c = ticker_to_cik(ic_hist)
+    t2c = ticker_to_cik(ic_hist, hanshof_ticker_periods(hans))
 
     rows = []
     for day, g in snaps.groupby("date"):
@@ -84,9 +41,9 @@ def main() -> None:
         }
         if day <= hans.index.max():
             h_day = hans.index[hans.index <= day].max()
-            h = {t2c.get(_key(t)) for t in hans[h_day]} - {None}
+            h = {t2c.get(key(t)) for t in hans[h_day]} - {None}
             row.update({"hanshof_in_v": len(h & v) / len(v), "hanshof_extra": len(h - v),
-                        "h_unmapped": sum(t2c.get(_key(t)) is None for t in hans[h_day])})
+                        "h_unmapped": sum(t2c.get(key(t)) is None for t in hans[h_day])})
         rows.append(row)
     out = pd.DataFrame(rows)
     for col in ("ic_in_v", "hanshof_in_v"):

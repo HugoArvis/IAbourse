@@ -7,24 +7,14 @@ Sources:
 Usage: python data_pipeline/audits/membership_audit.py
 """
 
+import sys
 from pathlib import Path
 
 import index_constitution as ic
 import pandas as pd
 
-RAW = Path(__file__).resolve().parents[1] / "cache" / "raw"
-HANSHOF_CSV = RAW / "sp_500_historical_components.csv"
-
-
-def load_hanshof() -> pd.Series:
-    """Return a Series indexed by date, values = frozenset of tickers."""
-    df = pd.read_csv(HANSHOF_CSV, parse_dates=["date"]).sort_values("date")
-    return df.set_index("date")["tickers"].map(lambda s: frozenset(s.split(",")))
-
-
-def ic_members_at(hist: pd.DataFrame, day: pd.Timestamp) -> frozenset:
-    active = (hist["opt-in"] <= day) & (hist["opt-out"].isna() | (hist["opt-out"] > day))
-    return frozenset(hist.loc[active, "symbol"])
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from membership.wiki_sources import ic_members_at, load_hanshof  # noqa: E402,F401
 
 
 def main() -> None:
