@@ -69,24 +69,58 @@ def run() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                         "ok": p is not None and abs(p / r.implied - 1) <= TOLERANCE,
                     })
     checks = pd.DataFrame(checks)
+    return checks, pick_periods(checks), holdings
 
-    # Per company and snapshot: the validated (ticker, source); most often validated wins,
-    # yfinance preferred on ties.
-    ok = checks[checks["ok"]].copy()
-    score = ok.groupby(["company_id", "ticker", "source"]).size().rename("n_ok")
-    ok = ok.join(score, on=["company_id", "ticker", "source"])
+
+def pick_periods(checks: pd.DataFrame) -> pd.DataFrame:
+    """Validated (ticker, source) per company as runs of consecutive held snapshots.
+
+    Selection is by continuity, not by total count: providers sometimes splice two
+    companies under one ticker (Yahoo's AA = Alcoa Inc. until 2016, then Alcoa Corp.),
+    and an unrelated price can match within the tolerance by chance on one date.
+      - per snapshot, the candidate whose run of consecutive validations is longest wins
+        (then most validations overall, then yfinance);
+      - a single isolated validation contradicted by a neighbouring snapshot (price
+        present but different) is a coincidence and is dropped;
+      - a period never spans a snapshot where it was not picked.
+    """
+    keys = ["company_id", "ticker", "source"]
+    agg = (checks.groupby(keys + ["date"])
+                 .agg(ok=("ok", "any"), has_px=("market", lambda s: s.notna().any()))
+                 .reset_index().sort_values(keys + ["date"]))
+    g = agg.groupby(keys)
+    agg["run"] = g["ok"].transform(lambda s: (s != s.shift()).cumsum())
+    agg["run_len"] = agg.groupby(keys + ["run"])["ok"].transform("size")
+    contradicted = lambda col: g[col].shift().fillna(False).astype(bool)  # noqa: E731
+    agg["prev_bad"] = contradicted("has_px") & ~contradicted("ok")
+    agg["next_bad"] = (g["has_px"].shift(-1).fillna(False).astype(bool)
+                       & ~g["ok"].shift(-1).fillna(False).astype(bool))
+    ok = agg[agg["ok"] & ~((agg["run_len"] == 1) & (agg["prev_bad"] | agg["next_bad"]))].copy()
+    ok["n_ok"] = ok.groupby(keys)["date"].transform("size")
     ok["src_rank"] = ok["source"].map({s: i for i, s in enumerate(SOURCES)})
-    best = (ok.sort_values(["n_ok", "src_rank"], ascending=[False, True])
+    best = (ok.sort_values(["run_len", "n_ok", "src_rank"], ascending=[False, False, True])
               .drop_duplicates(["company_id", "date"]))
-    periods = (best.groupby(["company_id", "ticker", "source"])["date"]
-                   .agg(first_ok="min", last_ok="max", n_ok="size").reset_index())
-    return checks, periods, holdings
+
+    # Index of each held snapshot within its company, to detect breaks between picks.
+    held = agg[["company_id", "date"]].drop_duplicates().sort_values(["company_id", "date"])
+    held["pos"] = held.groupby("company_id").cumcount()
+    best = best.merge(held, on=["company_id", "date"]).sort_values(["company_id", "date"])
+    same = ((best["company_id"] == best["company_id"].shift())
+            & (best["ticker"] == best["ticker"].shift())
+            & (best["source"] == best["source"].shift())
+            & (best["pos"] == best["pos"].shift() + 1))
+    best["period"] = (~same).cumsum()
+    return (best.groupby(["period"] + keys)["date"]
+                .agg(first_ok="min", last_ok="max", n_ok="size")
+                .reset_index().drop(columns="period"))
 
 
-def coverage_report(checks: pd.DataFrame, holdings: pd.DataFrame) -> None:
+def coverage_report(periods: pd.DataFrame, holdings: pd.DataFrame) -> None:
     """Share of ALL index members (Vanguard holdings) with a validated price, per year."""
     held = holdings.groupby(["company_id", "date"], as_index=False)["weight"].sum()
-    ok = checks[checks["ok"]].drop_duplicates(["company_id", "date"])[["company_id", "date"]]
+    ok = held.merge(periods, on="company_id")
+    ok = ok[(ok["date"] >= ok["first_ok"]) & (ok["date"] <= ok["last_ok"])]
+    ok = ok.drop_duplicates(["company_id", "date"])[["company_id", "date"]]
     held = held.merge(ok.assign(ok=True), on=["company_id", "date"], how="left")
     held["ok"] = held["ok"].notna()
     by_year = held.groupby(held["date"].dt.year).apply(
@@ -103,7 +137,7 @@ if __name__ == "__main__":
     checks, periods, holdings = run()
     checks.to_parquet(CACHE / "price_checks.parquet")
     periods.to_parquet(CACHE / "company_tickers.parquet")
-    coverage_report(checks, holdings)
+    coverage_report(periods, holdings)
     mismatch = checks[checks["market"].notna() & ~checks["ok"]]
     print(f"\nchecks: {len(checks)}, with market price: {checks['market'].notna().mean():.1%}, "
           f"ok: {checks['ok'].mean():.1%}, price present but mismatching: {len(mismatch)}")

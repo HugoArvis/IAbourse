@@ -1,3 +1,11 @@
 # CLAUDE.log — Append-only error log
 # Format: [DATE] [FILE] [TYPE] — description + fix applied
 
+
+[2026-11-20] [data_pipeline/prices/panel.py] [MEMORY] — building the price panel kept every price series in memory; on this 5 GB machine the kernel OOM-killer killed VS Code.
+  Fix: per-company series cache, rows trimmed to the needed window early. Run heavy pipeline scripts under a memory cap:
+  systemd-run --user --scope -q -p MemoryMax=1500M -p MemorySwapMax=0 .venv/bin/python -I <script>
+[2026-11-20] [data_pipeline/prices/validate.py] [BUG] — ticker picked by total validation count: coincidental 3% price matches (AA vs Howmet 2021/2023) won over the continuous ticker, and Yahoo splices two companies under one ticker (AA = Alcoa Inc. until 2016, then Alcoa Corp.).
+  Fix: pick by run of consecutive validations, drop isolated contradicted matches, periods never span a non-picked snapshot.
+[2026-11-20] [data_pipeline/prices/download.py] [DATA] — Yahoo keeps only a 1-2 row stub for recently delisted tickers (EA, AVB...), cached as if valid.
+  Fix: answers of <= 5 rows are not cached; those tickers fall back to Tiingo.
