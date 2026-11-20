@@ -52,7 +52,7 @@ def load_holdings() -> pd.DataFrame:
     return df
 
 
-def assign_company_ids(df: pd.DataFrame) -> pd.Series:
+def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
     """Group entities (CIKs) that are the same company; returns entity -> company_id."""
     uf = UnionFind()
     for e in df["entity"].unique():
@@ -79,6 +79,13 @@ def assign_company_ids(df: pd.DataFrame) -> pd.Series:
             succession = ent_last[prev.entity] == prev.max and ent_first[cur.entity] == cur.min
             if contiguous and succession:
                 uf.union(prev.entity, cur.entity)
+    # Rule 3: successor issuers proven by an 8-K12B and price continuity (successors.py).
+    if use_links:
+        from membership.successors import load_links
+        known = set(df["entity"])
+        for pred, succ in zip(*load_links()[["pred", "succ"]].values.T):
+            if pred in known and succ in known:
+                uf.union(pred, succ)
     ids = {e: uf.find(e) for e in df["entity"].unique()}
     # Company id = most recent entity of the group (readable and stable going forward).
     last_seen = df.groupby("entity")["date"].max()
