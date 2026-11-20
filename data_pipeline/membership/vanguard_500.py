@@ -5,15 +5,24 @@ official, independent snapshot of index membership (and weights).
 
   - N-Q (2004-2018): HTML schedule of investments, names only.
   - NPORT-P (2019+): structured XML with CUSIP / ISIN / LEI.
+
+Outputs: cache/vanguard500_snapshots.parquet (one row per date and holding),
+         cache/vanguard500_name_cik.parquet  (holding name -> CIK)
+Usage: python data_pipeline/membership/vanguard_500.py
 """
 
 import re
+import sys
 import xml.etree.ElementTree as ET
 from io import StringIO
+from pathlib import Path
 
 import pandas as pd
 
-from sources import sec
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from sources import sec  # noqa: E402
 
 VANGUARD_INDEX_FUNDS_CIK = 36405
 SERIES_500_INDEX = "S000002839"  # from https://www.sec.gov/files/company_tickers_mf.json (VFIAX, VOO)
@@ -68,7 +77,7 @@ def parse_nq(html: str) -> pd.DataFrame:
 
 def _clean(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
-    df["name"] = (df["name"].str.replace(r"^[^A-Za-z]+", "", regex=True)       # leading markers
+    df["name"] = (df["name"].str.replace(r"^[^A-Za-z0-9]+", "", regex=True)    # leading markers (keep "3M")
                             .str.replace(r"\s*\(\d\)\s*$", "", regex=True)        # trailing footnote
                             .str.replace(r"\s+", " ", regex=True).str.strip())
     return df.drop_duplicates("name").reset_index(drop=True)
@@ -139,3 +148,15 @@ def snapshots(min_weight: float = 1e-5) -> pd.DataFrame:
     df = df[df["value_k"] > 0]
     df["weight"] = df["value_k"] / df.groupby("date")["value_k"].transform("sum")
     return df[df["weight"] >= min_weight].reset_index(drop=True)
+
+
+if __name__ == "__main__":
+    from membership.entity_match import match_names
+
+    snaps = snapshots()
+    snaps.to_parquet(ROOT / "cache" / "vanguard500_snapshots.parquet")
+    names = snaps.groupby("name")["date"].agg(first_seen="min", last_seen="max").reset_index()
+    matched = match_names(names)
+    matched.to_parquet(ROOT / "cache" / "vanguard500_name_cik.parquet")
+    print(f"{snaps['date'].nunique()} snapshots, {len(names)} names, "
+          f"{matched['cik'].notna().mean():.1%} matched to a CIK")

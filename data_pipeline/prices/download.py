@@ -28,6 +28,7 @@ SOURCES = ("yfinance", "tiingo")
 START = "1995-01-01"
 BATCH = 40
 PAUSE = 3.0  # seconds between batches
+MIN_ROWS = 5  # a yfinance answer this short is a failed download, not a price history
 
 
 def yf_symbol(ticker: str) -> str:
@@ -56,6 +57,8 @@ def download(tickers: list[str]) -> None:
                                         "Adj Close": "adj_close", "Volume": "volume",
                                         "Dividends": "dividends", "Stock Splits": "splits"})
                 df.index.name = "date"
+                if len(df) <= MIN_ROWS:
+                    continue  # truncated answer (seen under rate limiting): retry next run
             df.to_parquet(_path(t))  # empty frame = "no data" marker, avoids re-asking
         done = min(i + BATCH, len(todo))
         print(f"  {done}/{len(todo)}", flush=True)
