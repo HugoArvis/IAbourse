@@ -3,8 +3,8 @@
 Layers, most reliable first:
   1. SEC company_tickers.json: official mapping for currently listed tickers.
   2. index-constitution former members: name -> CIK within their membership period.
-  3. Remaining historical tickers (hanshof): company name from the Wikipedia changes
-     table, else from Tiingo metadata, then name -> CIK within the period the ticker
+  3. Remaining historical tickers (hanshof): company names from the Wikipedia changes
+     table and from Tiingo metadata (both tried), then name -> CIK within the period the ticker
      was in the index. Tiingo names the *current* holder of a reused ticker; the
      period constraint rejects those (the CIK must file annual reports at the time).
 """
@@ -74,27 +74,43 @@ def ticker_to_cik(ic_hist: pd.DataFrame, ticker_periods: pd.DataFrame | None = N
         return mapping
 
     todo = ticker_periods[~ticker_periods["ticker"].map(key).isin(mapping)]
+    names = historical_ticker_names(todo)
+    if not names.empty:
+        resolved = match_names(names).dropna(subset=["cik"]).sort_values("pref")
+        for t, cik in resolved.drop_duplicates("ticker")[["ticker", "cik"]].itertuples(index=False):
+            mapping[key(t)] = int(cik)
+    return mapping
+
+
+def historical_ticker_names(ticker_periods: pd.DataFrame, fetch: bool = True) -> pd.DataFrame:
+    """Company names of historical tickers (columns ticker, first, last).
+
+    Both sources are kept, Wikipedia first (pref 0): its wording sometimes fails to
+    match EDGAR ("Interpublic Group of Companies") where Tiingo's (pref 1) matches.
+    Tiingo names are fetched when missing from cache, unless fetch=False."""
     wiki = wikipedia_change_names()
     rows = []
-    tiingo_available = True
-    for t, first, last in zip(todo["ticker"], todo["first"], todo["last"]):
-        name = wiki.get(key(t))
-        if name is None and tiingo_available:
-            try:
-                m = tiingo.meta(t.replace(".", "-"))
-                name = (m or {}).get("name")
-            except tiingo.RateLimited:
-                tiingo_available = False  # keep going with cached / Wikipedia names only
-                print("[tickers] Tiingo quota reached: remaining tickers resolved from cache only")
-        elif name is None:
-            cached = tiingo.CACHE / "meta" / f"{t.replace('.', '-').upper()}.json"
-            if cached.exists():
-                name = (json.loads(cached.read_text()) or {}).get("name")
-        if name:
-            rows.append({"ticker": t, "name": name.strip(), "first_seen": first, "last_seen": last})
-    if rows:
-        resolved = match_names(pd.DataFrame(rows))
-        for t, cik in zip(resolved["ticker"], resolved["cik"]):
-            if pd.notna(cik):
-                mapping[key(t)] = int(cik)
-    return mapping
+    for t, first, last in zip(ticker_periods["ticker"], ticker_periods["first"], ticker_periods["last"]):
+        names = [wiki.get(key(t)), _tiingo_name(t, fetch=fetch)]
+        if names[1] is False:
+            fetch = False  # keep going with cached / Wikipedia names only
+            print("[tickers] Tiingo quota reached: remaining tickers resolved from cache only")
+            names[1] = None
+        for pref, name in enumerate(names):
+            if name:
+                rows.append({"ticker": t, "name": name.strip(), "first_seen": first, "last_seen": last,
+                             "pref": pref})
+    return pd.DataFrame(rows, columns=["ticker", "name", "first_seen", "last_seen", "pref"])
+
+
+def _tiingo_name(ticker: str, fetch: bool) -> str | None | bool:
+    """Company name from Tiingo metadata (cached; fetched if allowed). False = quota reached."""
+    cached = tiingo.CACHE / "meta" / f"{ticker.replace('.', '-').upper()}.json"
+    if cached.exists():
+        return (json.loads(cached.read_text()) or {}).get("name")
+    if not fetch:
+        return None
+    try:
+        return (tiingo.meta(ticker.replace(".", "-")) or {}).get("name")
+    except tiingo.RateLimited:
+        return False
