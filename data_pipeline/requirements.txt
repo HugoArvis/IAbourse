@@ -1,0 +1,17 @@
+# Data pipeline (python data_pipeline/...) and exploration notebooks
+pandas>=3.1
+numpy>=2.5
+pyarrow>=26.0
+requests>=2.34
+python-dotenv>=1.2
+yfinance>=1.8
+index-constitution>=1.0.1
+RapidFuzz>=3.14
+lxml>=6.1
+beautifulsoup4>=4.15
+# notebooks
+matplotlib>=3.11
+scipy>=1.18
+ipykernel>=7.4
+nbformat>=5.11
+nbconvert>=7.17

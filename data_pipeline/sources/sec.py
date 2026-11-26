@@ -59,3 +59,26 @@ def filings(cik: int) -> pd.DataFrame:
 
 def archive_url(cik: int, accession: str, document: str) -> str:
     return f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession.replace('-', '')}/{document}"
+
+
+def trading_symbols(cik: int, max_filings: int = 6) -> set[str]:
+    """Tickers the issuer itself declared (dei:TradingSymbol) in its XBRL periodic reports.
+
+    Read from the SEC rendering of the cover page (R1.htm), on up to `max_filings`
+    reports spread over the entity's history. XBRL started in 2009-2011 and the field
+    is optional, so older or smaller filers often return nothing."""
+    import re
+
+    f = filings(cik)
+    f = f[f["form"].isin(["10-K", "10-Q", "20-F", "40-F"]) & (f["isXBRL"] == 1)]
+    step = max(1, len(f) // max_filings)
+    found = set()
+    for r in f.iloc[::step].head(max_filings).itertuples():
+        try:
+            page = get(archive_url(cik, r.accessionNumber, "R1.htm"))
+        except requests.HTTPError:
+            continue  # early XBRL filings have no rendered pages
+        for value in re.findall(r"Trading Symbol.*?</td>\s*<td[^>]*>\s*([^<]*)<", page, re.S | re.I):
+            if re.fullmatch(r"[A-Za-z]{1,5}([.\-][A-Za-z])?", value.strip()):
+                found.add(value.strip().upper().replace("-", "."))
+    return found

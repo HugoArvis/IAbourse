@@ -9,3 +9,6 @@
   Fix: pick by run of consecutive validations, drop isolated contradicted matches, periods never span a non-picked snapshot.
 [2026-11-20] [data_pipeline/prices/download.py] [DATA] — Yahoo keeps only a 1-2 row stub for recently delisted tickers (EA, AVB...), cached as if valid.
   Fix: answers of <= 5 rows are not cached; those tickers fall back to Tiingo.
+[2026-11-26] [data_pipeline/membership/tickers.py] [BUG] — the Tiingo name of a historical ticker was only tried when Wikipedia had no name; Wikipedia's wording ("Interpublic Group of Companies") sometimes fails to match EDGAR, so IPG, DFS, ETFC, FDO... never got a CIK and their companies had no price.
+  Fix: both names are tried (Wikipedia first). Companies still without ticker get fallbacks: tickers declared in their own XBRL reports (sec.trading_symbols) and name-matching hanshof tickers listed while they were held.
+[2026-11-26] [data_pipeline/sources/tiingo.py] [DATA] — Tiingo prices by ticker only serve the CURRENT holder of a reused ticker (STI 2018-2019 returns nothing) and sometimes a 1-row stub (WRK). Old holders of reused tickers are not recoverable from Tiingo free.
