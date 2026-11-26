@@ -10,3 +10,4 @@ dist/
 mlruns/
 *.egg-info/
 .DS_Store
+data_pipeline/cache/
