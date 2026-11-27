@@ -1,4 +1,4 @@
-# CLAUDE.md — Trading AI Project
+# CLAUDE.md — IAbourse
 
 ## Agent Guidelines (Original Rules — Never Override)
 
@@ -18,280 +18,234 @@
 - Do not hallucinate APIs, libraries, or features
 - Do not generate untested or speculative code
 
+### How decisions are made on this project
+
+- The project owner decides the strategy. Explain the options and give a
+  recommendation, but do not decide for them.
+- Work step by step: propose and discuss each step before implementing it, and do
+  not start the next phase until asked.
+
 ---
 
 ## Project Overview
 
-A hybrid deep learning system that predicts stock market signals and executes
-paper trades automatically. Combines historical price data (TFT model) and
-financial news sentiment (FinBERT) to output a **conviction score from 0 to 10**,
-which maps to a position size. A Reinforcement Learning layer (PPO) then
-fine-tunes the strategy through simulation before any real capital is used.
+A machine-learning stock selection system on the S&P 500. Every week it ranks the
+index members by expected return relative to the other members, holds the top of
+the ranking (long-only), and trades through Alpaca (paper trading first).
 
-**Key output formula:**
-```
-probs  = model(state)           # [P_sell, P_hold, P_buy] via softmax
-score  = 5 + (P_buy - P_sell) * 5   # float in [0.0, 10.0]
-position_pct = (score - 5) / 5 * 100  # % of portfolio to hold
-```
+Goals:
+1. Gain solid, hands-on machine-learning experience.
+2. Grow a small personal capital (EUR) by reinvesting the gains (compounding).
+3. Beat hand-made rules (non-ML factor strategies) by at least a few % per year,
+   after costs. Beating the index by a few % per year is the realistic target.
 
-**Score interpretation:**
-```
-0.0 – 2.0  →  Strong sell   (position: -100% to -60%)
-2.0 – 3.5  →  Partial sell  (position: -60%  to -30%)
-3.5 – 6.5  →  Hold          (position: ~0%, minor adjustments)
-6.5 – 8.0  →  Partial buy   (position: +30%  to +60%)
-8.0 – 10.0 →  Strong buy    (position: +60%  to +100%)
-```
-
-**Confidence filter:** if `max(P_sell, P_hold, P_buy) < 0.55` → force score=5.0, no trade.
+The project was restarted in November 2026 on new data foundations. The old system
+(TFT + FinBERT + PPO, per-stock conviction score 0–10) is abandoned: see
+"Legacy code" below.
 
 ---
 
-## Project Structure
+## Strategy (decided November 2026)
 
-```
-trading-dashboard/
-├── backend/                    # All Python — FastAPI + ML + trading logic
-│   ├── main.py                 # FastAPI entry point, REST routes, WebSocket
-│   ├── scheduler.py            # APScheduler — daily decision at 15:30 NY
-│   ├── risk_manager.py         # Hard-coded safety rules (never bypass)
-│   ├── alpaca_connector.py     # Alpaca paper trading API wrapper
-│   ├── ws_manager.py           # Active WebSocket connection manager
-│   ├── config.py               # All constants and hyperparameters
-│   ├── .env                    # API keys — NEVER commit this file
-│   ├── requirements.txt
-│   ├── data/
-│   │   ├── fetch_prices.py     # yfinance → local Parquet cache
-│   │   ├── fetch_news.py       # Finnhub company news → daily sentiment
-│   │   └── feature_engineering.py  # RSI, MACD, Bollinger, ATR, sentiment agg
-│   ├── models/
-│   │   ├── tft_model.py        # Temporal Fusion Transformer (pytorch-forecasting)
-│   │   ├── finbert_embedder.py # FinBERT wrapper (HuggingFace local inference)
-│   │   └── custom_policy.py    # TFT as PPO feature extractor (SB3 CustomPolicy)
-│   ├── rl/
-│   │   ├── trading_env.py      # gym.Env — the trading simulation environment
-│   │   ├── reward_functions.py # Incremental Sharpe + drawdown penalty + tx cost
-│   │   ├── train_rl.py         # PPO training loop (Stable-Baselines3)
-│   │   └── callbacks.py        # EvalCallback + early stopping
-│   └── training/
-│       ├── dataset.py          # TimeSeriesDataSet (pytorch-forecasting)
-│       ├── train_supervised.py # Phase 1 supervised training loop
-│       └── evaluate.py         # Walk-forward validation, metrics
-│
-├── frontend/                   # React + Vite + TailwindCSS
-│   ├── src/
-│   │   ├── main.jsx
-│   │   ├── App.jsx
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx   # Live score gauge + OHLC chart + P&L
-│   │   │   ├── Metrics.jsx     # Sharpe, drawdown, win rate charts
-│   │   │   ├── Trades.jsx      # Trade log + softmax probabilities
-│   │   │   └── Control.jsx     # Start/Stop/Kill switch + risk config
-│   │   ├── components/
-│   │   │   ├── ScoreGauge.jsx      # Animated 0–10 circular gauge (WebSocket)
-│   │   │   ├── OHLCChart.jsx       # TradingView Lightweight Charts
-│   │   │   ├── PortfolioChart.jsx  # P&L line chart (recharts)
-│   │   │   ├── DrawdownChart.jsx   # Red area drawdown chart (recharts)
-│   │   │   └── KillSwitch.jsx      # Red button with confirmation dialog
-│   │   ├── hooks/
-│   │   │   └── useWebSocket.js     # Custom hook — WS connection + auto-reconnect
-│   │   └── api/
-│   │       └── client.js           # fetch wrapper → FastAPI :8000
-│   ├── package.json
-│   ├── vite.config.js
-│   └── tailwind.config.js
-│
-├── CLAUDE.md                   # This file — read at every session
-├── CLAUDE.log                  # Error log — append only, never delete
-└── .gitignore                  # Must include: .env, node_modules, __pycache__, *.parquet
-```
+### Universe and data
+- **S&P 500, point-in-time membership**: on each date, only the stocks that were
+  in the index on that date, including those that later left it (no survivorship
+  bias).
+- **Training data starts in 2010.**
+- **Free data only** for now. The data layer must stay swappable (one module per
+  source in `data_pipeline/sources/`) so that a paid API can replace it later.
+
+### Labels
+- For each date, compute every member's forward return over the horizon, minus the
+  cross-sectional mean of the members, and split the members into **terciles**:
+  0 = worst third, 1 = middle third, 2 = best third.
+- Terciles are relative: subtracting a common benchmark (SPY, RSP) does not change
+  them. The old ±1.5% vs SPY rule is dropped (unstable class shares).
+- **Two horizons: 5 and 21 trading days.** The daily horizon is too noisy.
+- **Returns are measured open to open**: from the open of t+1 (when orders are
+  executed) to the open of t+1+h, adjusted for dividends and splits.
+
+### Timing convention
+- Decision on day t uses **all data up to the close of day t** (end-of-day data,
+  same sources as the training history). The job runs at night.
+- Orders are executed at the **open of t+1**, in the opening auction (Alpaca
+  "opg" orders, to be verified). This is 15:30 Paris time.
+- The backtest also compares the variant "decide on t, execute at the close of t+1".
+
+### Models
+- **LightGBM, CatBoost, XGBoost** (gradient-boosted trees), multiclass on the
+  terciles. The score that ranks stocks (e.g. P(best) − P(worst)) is chosen in
+  phase 2.
+- One model per horizon. The two rankings are combined by a **weighted average of
+  ranks**; the weights are chosen on the validation period, never on the test.
+- Validation: **walk-forward only**, with purging and an embargo of at least the
+  label horizon between training and validation (labels overlap in time).
+- Dropped: PPO (reinforcement learning), TFT. FinBERT may come back later only to
+  score SEC filing text, compared against Loughran-McDonald word lists.
+
+### Portfolio
+- **Long-only, 50 stocks, equal weight** (20 / 50 / 100 compared in backtest).
+  A long-short portfolio is computed only as a diagnostic of the signal.
+- **Weekly rebalance with a buffer zone**: buy a stock when it enters the top 50,
+  sell it when it falls out of about the top 100. This cuts turnover and costs.
+  Backtest compares weekly / monthly, with and without buffer.
+- Gains are reinvested. A small capital needs fractional shares (Alpaca supports
+  them; check per stock).
+
+### How success is measured — benchmark ladder
+Every backtest reports, on the same dates and with the same costs:
+1. the index: RSP (equal weight) and SPY;
+2. single-factor rules: momentum, low volatility, short-term reversal;
+3. a multi-factor rule: average of the factor ranks;
+4. a linear model (logistic / ridge) on the same features as the trees;
+5. each GBDT, then the two horizons combined.
+
+**Success = the ML portfolio beats the multi-factor rule after costs, consistently
+across years**, not only on average.
+If ML ≈ multi-factor rule on free S&P 500 data, the next step is paid data: it
+both fills the remaining gaps of the S&P 500 history and allows a wider universe
+(a wider universe needs paid data too: free sources lack prices of delisted
+small caps).
+
+### Risk rules (to implement in the new execution code — never bypass)
+1. **Stop on relative underperformance**: stop the model if the portfolio lags
+   the index by more than a threshold over a rolling window (threshold to define).
+   Replaces the old −20% absolute stop.
+2. **Max 3–5% of the portfolio per stock.**
+3. **Kill switch**: liquidate everything and stop, with explicit confirmation.
+4. **At least 6 months of paper trading** before any real money.
+
+Removed from the old rules: confidence filter 0.55 (meaningless with relative
+labels), volume filter (all S&P 500 members are liquid), earnings blackout.
+
+### Still open (decide with the owner when the step comes)
+- Delisting during the label horizon (last price, delisting return…).
+- Transaction cost assumptions for the backtest (spread + slippage per side).
+- Rebalance weekday (backtest should check that results do not depend on it).
+- Threshold and window of the relative stop.
 
 ---
 
-## Tech Stack (100% Free, Verified May 2026)
+## Roadmap
 
-### Backend — Python
-| Library | Version | Purpose |
+| Phase | Content | Status |
 |---|---|---|
-| `fastapi` | >=0.110.0 | REST API + WebSocket server |
-| `uvicorn` | >=0.27.0 | ASGI server |
-| `apscheduler` | >=3.10.0 | Daily 15:30 NY scheduler |
-| `yfinance` | >=0.2.40 | Historical OHLCV (free, no key) |
-| `finnhub-python` | >=2.4.20 | News + sentiment + real-time quotes |
-| `alpaca-py` | >=0.26.0 | Paper trading execution |
-| `ta` | >=0.10.2 | Technical indicators (RSI, MACD…) |
-| `transformers` + `torch` | >=4.38 / 2.2 | FinBERT local inference |
-| `pytorch-forecasting` | >=1.1.0 | TFT implementation |
-| `pytorch-lightning` | >=2.2.0 | Training loop |
-| `stable-baselines3` | >=2.3.0 | PPO agent |
-| `gymnasium` | >=0.29.1 | Gym environment interface |
-| `optuna` | >=3.5.0 | Hyperparameter tuning |
-| `vectorbt` | >=0.26.2 | Backtesting |
-| `mlflow` | >=2.10.0 | Experiment tracking (local) |
-| `python-dotenv` | >=1.0.0 | .env file loading |
-| `loguru` | >=0.7.0 | Structured logging |
+| 0. Data sources | PIT membership (Vanguard 500 holdings), validated price panel | Done |
+| 1. Exploration | `notebooks/01_exploration_prix_cibles.ipynb`: bias, labels, IC | Done |
+| 2. Feature engineering | labels, price/volume features, IC notebook 02, linear + LightGBM baselines with purged CV; then PCA residuals / idiosyncratic vol, peer groups (clustering, SIC); then XBRL fundamentals, macro, short interest, SEC text | Next |
+| 3. Models + backtest | 3 GBDTs, horizon combination, full benchmark ladder | |
+| 4. Paper trading | new execution code + new dashboard/API, ≥ 6 months | |
+| 5. Paid data | only if phase 3 shows ML ≈ multi-factor rule | Conditional |
 
-### Frontend — JavaScript
-| Library | Purpose |
-|---|---|
-| React 18 + Vite 5 | Framework + bundler |
-| `react-router-dom` v6 | Client-side routing |
-| `lightweight-charts` v4 | TradingView OHLC charts (candlesticks) |
-| `recharts` v2 | Sharpe, drawdown, P&L charts |
-| `tailwindcss` v3 | Utility-first styling |
-| Native `WebSocket` API | Real-time updates (no extra lib needed) |
-
-### APIs (all free tiers)
-| API | Use | Limit | Key required |
-|---|---|---|---|
-| `yfinance` | Historical prices for training | None known | No |
-| Finnhub | News, sentiment, real-time quotes | 60 req/min | Yes (free signup) |
-| Finnhub WebSocket | Live price stream | 50 symbols max | Yes |
-| Alpaca paper | Order execution, paper account | Free forever | Yes (free signup) |
-
-**DO NOT USE:** IEX Cloud (shut down Aug 2024), Polygon.io free tier (too limited),
-NewsAPI (not financial-specific enough).
+Feature rules: normalize per date (cross-sectional ranks); fit any scaler, PCA or
+clustering on training data only; store features in float32, built year by year
+into parquet files.
 
 ---
 
-## Environment Variables (.env — never commit)
+## Data Pipeline (`data_pipeline/`)
 
 ```
-FINNHUB_API_KEY=your_key_here
-ALPACA_API_KEY=your_key_here
-ALPACA_SECRET_KEY=your_key_here
+data_pipeline/
+├── sources/        # one module per external source (swappable)
+│   ├── sec.py      # EDGAR: filings, XBRL, archives (10 req/s, generic User-Agent)
+│   └── tiingo.py   # Tiingo prices + metadata (free quota ~50 requests/hour)
+├── membership/     # point-in-time S&P 500 membership
+│   ├── vanguard_500.py      # Vanguard 500 Index Fund holdings (N-Q, NPORT-P) = reference
+│   ├── wiki_sources.py      # hanshof + index-constitution (Wikipedia-derived, cross-check)
+│   ├── entity_match.py      # company name -> CIK
+│   ├── tickers.py           # ticker -> CIK
+│   ├── successors.py        # same company, new CIK (8-K12B + 1:1 price continuity)
+│   └── build_membership.py  # -> cache/sp500_membership.parquet (company_id = grouped CIKs)
+├── prices/
+│   ├── candidates.py   # candidate tickers per company
+│   ├── download.py     # yfinance download of the candidates
+│   ├── fill_tiingo.py  # fill gaps from Tiingo (resumable, sleeps on quota)
+│   ├── validate.py     # unadjusted close vs Vanguard implied price (3% tolerance)
+│   └── panel.py        # -> cache/price_panel.parquet (status validated / extended)
+├── audits/         # coverage and consistency checks
+├── cache/          # all downloads and outputs (git-ignored, never re-download)
+└── requirements.txt
+notebooks/          # exploration notebooks (kernel "iabourse")
+```
+
+Build order: `membership/vanguard_500.py` → `membership/build_membership.py` →
+`prices/candidates.py` → `prices/download.py` → `prices/fill_tiingo.py` →
+`prices/validate.py` → `membership/successors.py` → re-run `build_membership.py`,
+`candidates.py`, `validate.py` → `prices/panel.py`.
+Run as `python data_pipeline/<folder>/<script>.py` from the repo root.
+
+Price panel facts:
+- `ret` = daily total return (close to close). It is NaN on spin-off /
+  special-dividend days (`corp_action`), which free data get wrong.
+- Price levels (`open`…`close`, `adj_close`) may jump where the series switches
+  ticker or source: always chain returns, never levels across a switch.
+- `status`: `validated` = checked against Vanguard; `extended` = same series
+  outside the checked runs (e.g. after the last Vanguard snapshot).
+- Coverage of member-days (validated): ~83% in 2010, ~98% from 2019 on.
+  Remaining gaps need paid data: reused tickers (STI, APC, SPLS, EMC, MON…) and
+  tickers missing from Tiingo (LLL, HAR, HOT, BEAM, WIN, FRC, SBNY…).
+
+Planned data sources (free): SEC EDGAR XBRL fundamentals (with `filed` dates),
+filing text (8-K/10-K/10-Q), Form 4; FRED/ALFRED, CBOE, Fama-French for macro;
+FINRA short interest (use the publication date).
+Known gaps of free data: delisted-stock prices, historical financial news,
+analyst consensus, implied volatility.
+
+---
+
+## Data Leakage Rules (critical — always verify)
+
+- The universe on date t = index members **on date t**, never today's members.
+- Features for decision date t use data available **at or before the close of t**
+  (16:00 NY). The label starts at the open of t+1, so the close of t is allowed.
+- Every non-price input is keyed by the time it became **public**:
+  SEC filings by acceptance time (accepted after 16:00 on t → usable from t+1),
+  macro series by release date (ALFRED vintages, not revised values),
+  short interest by publication date.
+- Labels (open t+1 → open t+1+h) never enter features.
+- Validation and test periods are always after training periods; purge and
+  embargo ≥ the label horizon.
+- Anything fitted (scalers, PCA, clusters, ensemble weights, hyperparameters) is
+  fitted on training / validation data only, never on the test period.
+
+---
+
+## Hardware Constraints
+
+- Development machine: **5 GB RAM**. An out-of-memory error already killed VS Code.
+  Run heavy scripts under a memory cap:
+  `systemd-run --user --scope -q -p MemoryMax=1500M -p MemorySwapMax=0 python ...`
+- Target hardware: a cheap NUC with 8–16 GB. Design every job for that: float32,
+  year-by-year processing written to parquet, day subsampling for tuning.
+- Heavy jobs can run on free Kaggle notebooks. Never put API keys or `.env`
+  content in a Kaggle notebook.
+
+---
+
+## Environment Variables (`backend/.env` — never commit, never print)
+
+```
+TIINGO_API_KEY=...
+ALPACA_API_KEY=...
+ALPACA_SECRET_KEY=...
 ALPACA_BASE_URL=https://paper-api.alpaca.markets
 ```
 
-Load with: `from dotenv import load_dotenv` then `os.getenv("FINNHUB_API_KEY")`.
+SEC requests use a generic User-Agent (`data_pipeline/sources/sec.py`). Never put
+personal details (name, email) in requests to external services.
 
 ---
 
-## Development Phases (build in this exact order)
+## Legacy Code (obsolete — do not extend)
 
-### Phase 1 — Supervised Pretraining (weeks 1–5)
-Goal: TFT + FinBERT learn to classify each trading day as SELL / HOLD / BUY.
-
-1. `fetch_prices.py` — download 5+ years OHLCV for 10–20 US tickers via yfinance,
-   save as Parquet locally (never re-download, work from cache).
-2. `fetch_news.py` — Finnhub `company_news()` per ticker, run through FinBERT,
-   store daily aggregated sentiment scores.
-3. `feature_engineering.py` — compute RSI(14), MACD, Bollinger Bands, ATR(14),
-   SMA(20/50), EMA(12/26), volume ratio, VIX, day-of-week, quarter-end flag.
-4. `dataset.py` — build `TimeSeriesDataSet` with 60-day encoder window,
-   5-day prediction horizon.
-5. `train_supervised.py` — cross-entropy loss, class weights {SELL:3, HOLD:1, BUY:3}
-   to handle class imbalance. Walk-forward validation (never random split).
-6. Labelling rule: `relative_return = ticker_return(t→t+5) - SP500_return(t→t+5)`
-   SELL if < -1.5%, BUY if > +1.5%, HOLD otherwise.
-
-**Exit criterion:** directional accuracy > 55% on out-of-sample walk-forward folds.
-
-### Phase 2 — Reinforcement Learning Fine-tuning (weeks 6–10)
-Goal: PPO agent maximizes risk-adjusted returns using the pretrained TFT.
-
-1. `trading_env.py` — implement `gymnasium.Env`:
-   - `observation_space`: normalized 60-day feature window + current position + drawdown
-   - `action_space`: `Box(low=0.0, high=10.0, shape=(1,))` — the conviction score
-   - `step(action)`: apply position, compute reward, advance one day
-   - `reset()`: sample a random 1-year historical episode
-
-2. `reward_functions.py` — reward at each step:
-   ```python
-   r = sharpe_incremental - 2.0 * drawdown_penalty - 0.5 * transaction_cost
-   # sharpe_incremental = return_t / rolling_std(returns, 20)
-   # drawdown_penalty   = max(0, current_drawdown - 0.15)
-   # transaction_cost   = abs(delta_position) * 0.001
-   # terminal bonus     = sharpe_ratio_episode * 10
-   ```
-
-3. `custom_policy.py` — freeze pretrained TFT weights, attach MLP head for PPO
-   (Option A). Only fine-tune the MLP head initially.
-
-4. `train_rl.py` — PPO hyperparams:
-   `lr=3e-4, n_steps=2048, batch_size=64, n_epochs=10, gamma=0.99,
-   gae_lambda=0.95, clip_range=0.2, ent_coef=0.01, total_timesteps=1_000_000`
-
-**Exit criterion:** Sharpe > 1.0 and max drawdown < 20% on out-of-sample validation.
-
-### Phase 3 — Paper Trading (weeks 11–36 minimum)
-Goal: validate model behavior on real market data with virtual money.
-
-- Backend runs `scheduler.py` daily at **15:30 NY time**
-- Workflow: 09:30 fetch news → FinBERT → 15:00 compute features → 15:30 inference
-  → compute target position → compare to current position → send order to Alpaca
-- All orders go to `https://paper-api.alpaca.markets` (virtual money only)
-- Log every decision: score, probabilities, position delta, P&L, Sharpe
-
-**Exit criterion (before real money):** Sharpe > 1.0, max drawdown < 15%,
-win rate > 53%, over at least 6 months of paper trading.
-
----
-
-## FastAPI Routes & WebSocket Contract
-
-### REST Endpoints (backend/main.py)
-```
-GET  /api/status         → {"model_status": "active"|"stopped", "uptime": "..."}
-GET  /api/portfolio       → current positions + total P&L
-GET  /api/trades          → list of historical trades with scores + probabilities
-GET  /api/metrics         → Sharpe, Sortino, drawdown, win_rate, n_trades
-POST /api/model/start     → start the daily scheduler
-POST /api/model/stop      → graceful stop (no open position changes)
-POST /api/model/kill      → EMERGENCY: liquidate all + stop (requires confirm=true body)
-```
-
-### WebSocket (ws://localhost:8000/ws/live)
-Push every 1 second during market hours, every 60 seconds otherwise:
-```json
-{
-  "type": "live_update",
-  "timestamp": "2026-05-05T15:30:00Z",
-  "ticker": "AAPL",
-  "score": 7.4,
-  "p_sell": 0.08,
-  "p_hold": 0.24,
-  "p_buy": 0.68,
-  "position_pct": 48,
-  "portfolio_value": 103420.50,
-  "pnl_today_pct": 1.2,
-  "pnl_total_pct": 3.4,
-  "sharpe_rolling": 1.24,
-  "drawdown_current": -2.1,
-  "model_status": "active"
-}
-```
-
----
-
-## Hard-Coded Risk Rules (risk_manager.py — never bypass)
-
-These rules run **before** any order is sent to Alpaca, regardless of model output:
-
-1. **Global stop-loss:** if portfolio down > 20% from start → liquidate all, stop model
-2. **Max position per ticker:** never > 20% of portfolio in one stock
-3. **Confidence filter:** if `max(P_sell, P_hold, P_buy) < 0.55` → score = 5.0, no trade
-4. **Liquidity filter:** only trade stocks with avg daily volume > 1M shares
-5. **Earnings blackout:** freeze all positions 24h before quarterly earnings release
-6. **Kill switch:** POST /api/model/kill with `{"confirm": true}` → liquidate + stop
-
----
-
-## Model Output — Score Conversion Reference
-
-```python
-# From softmax probabilities to score and position
-p_sell, p_hold, p_buy = model.predict(state)  # sum to 1.0
-score = 5.0 + (p_buy - p_sell) * 5.0          # range [0.0, 10.0]
-position_pct = (score - 5.0) / 5.0 * 100      # range [-100%, +100%]
-
-# Confidence gate
-confidence = max(p_sell, p_hold, p_buy)
-if confidence < 0.55:
-    score = 5.0
-    position_pct = 0.0
-```
+`backend/` (FastAPI, scheduler at 15:30 NY, TFT/PPO training, per-stock score
+0–10, old risk manager) and `frontend/` (React dashboard) belong to the old system.
+They do not match the strategy above. The execution code, the API and the
+dashboard will be **redesigned** in phase 4; the new dashboard must show what
+matters for testing (positions vs ranking, turnover, costs, performance vs the
+benchmark ladder, data freshness). Until then, only `backend/.env` is used by the
+new pipeline. Do not delete legacy files without permission.
 
 ---
 
@@ -299,60 +253,33 @@ if confidence < 0.55:
 
 - `main`: stable releases only. Never commit or push directly to `main`.
 - `dev`: integration branch. Never commit directly to `dev` either.
-- Every feature or fix gets its own branch created from `dev`:
-  `feature/<short-name>` or `fix/<short-name>`.
+- Every feature or fix gets its own branch created from `origin/dev`:
+  `feature/<short-name>`, `fix/<short-name>` or `docs/<short-name>`.
 - Feature branches are merged into `dev` through a Pull Request.
+  **Check that the PR base is `dev`**: the GitHub default branch is `main`, and
+  the ruleset cannot block a PR opened against `main` by mistake.
 - When `dev` reaches a good, tested state, open a PR `dev` → `main` for the release.
 - Never force-push to `main` or `dev`. Never rewrite their history.
 
 ---
 
-## Local Dev — Start Commands
-
-```bash
-# Backend (Terminal 1)
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-
-# Frontend (Terminal 2)
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:5173
-
-# Build for single-process local use
-cd frontend && npm run build
-# FastAPI serves dist/ on :8000
-```
-
----
-
-## Key Decisions & Constraints Log
+## Key Decisions Log
 
 | Decision | Reason |
 |---|---|
-| Classification (3 classes) over regression | MSE on raw prices is unstable; cross-entropy converges reliably |
-| Score 0–10 derived from softmax, not predicted directly | Model expresses uncertainty naturally via probabilities |
-| Walk-forward validation only | Random split causes data leakage on time series |
-| PPO over SAC/TD3 for RL | More stable on noisy financial data, no replay buffer needed |
-| TFT pretrained before RL | RL from scratch = blind exploration for weeks |
-| FastAPI + React over Streamlit | Real-time WebSocket + TradingView charts require full JS control |
-| yfinance for training data | Free, no key, 20+ years history, save to Parquet once |
-| Finnhub for news + live data | 60 req/min free, news indexed by ticker, WS for 50 symbols |
-| Alpaca paper for execution | Free paper account, real order types, global signup |
-| IEX Cloud → DO NOT USE | Permanently shut down August 2024 |
-| Polygon.io free → DO NOT USE | Too rate-limited for this use case |
-
----
-
-## Data Leakage Rules (critical — always verify)
-
-- All features at time `t` must use data **strictly before** `t`
-- News cut-off: use only articles published before **09:30 NY** on day `t`
-- Price close of day `t` is only available after **16:00 NY** — never use as input feature
-- Labels (5-day forward return) reference `t+5`, so they must be excluded from features
-- Validation periods must always be **temporally after** training periods
+| Restart on new data foundations (Nov 2026) | Old pipeline had survivorship bias and constant neutral news history |
+| Vanguard 500 holdings as membership reference | Wikipedia-derived lists miss 30–37% of members in 2004 and contain errors |
+| Prices validated against Vanguard implied price | Catches reused tickers and wrong series |
+| Training from 2010 | ~16 years is enough for GBDTs; free coverage weaker before |
+| Cross-sectional tercile labels | Stable class shares; independent of the benchmark |
+| Horizons 5d + 21d combined | Daily is too noisy; two horizons strengthen the signal |
+| Decide after close t, execute at open t+1 | Uses the most recent day; same EOD data in training and live; easy to automate from Paris |
+| GBDTs (LightGBM, CatBoost, XGBoost) | Strong on tabular data, fit the hardware |
+| PPO and TFT dropped | Too complex for the signal available; ranking + simple portfolio rules instead |
+| Long-only top 50, weekly with buffer | Simple, low turnover, works with a small account |
+| Success = beat the multi-factor rule after costs | Beating the index alone does not prove ML adds value |
+| News from SEC filings, not Finnhub | Free history with exact publication times |
+| Free data first, paid data only if needed | Bottleneck is signal/features, not prices; paid data also needed for a wider universe |
 
 ---
 
