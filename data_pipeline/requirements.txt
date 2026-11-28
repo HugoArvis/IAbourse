@@ -15,5 +15,7 @@ scipy>=1.18
 ipykernel>=7.4
 nbformat>=5.11
 nbconvert>=7.17
-# code style (PEP 8 checker)
+# code style: PEP 8 (settings in setup.cfg / pyproject.toml)
 pycodestyle>=2.14
+black[jupyter]>=25.1
+isort>=6.0

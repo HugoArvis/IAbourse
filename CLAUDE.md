@@ -20,12 +20,21 @@
 
 ### Code style
 
-- Python code follows PEP 8 (https://peps.python.org/pep-0008/): lines
-  <= 79 characters, docstrings and comments <= 72, no assigned lambdas.
-- Check before every commit:
-  `python -m pycodestyle --max-doc-length=72 <files>`
-- Files written before 2026-11-28 are not compliant yet: fix them only
-  when asked, or when they are modified anyway.
+- All Python code (`.py` files and notebook code cells) follows PEP 8
+  (https://peps.python.org/pep-0008/): lines <= 79 characters,
+  docstrings and comments <= 72, imports grouped stdlib / third-party /
+  local, docstring summary on one line, closing quotes of multi-line
+  docstrings on their own line, no assigned lambdas.
+- Format, then check, before every commit (settings in `setup.cfg` and
+  `pyproject.toml`, run from the repo root):
+  ```
+  python -m black <files>
+  python -m isort <files>
+  python -m pycodestyle <files>
+  ```
+  black and isort do not rewrap docstrings and comments: do it by hand.
+- Project imports placed after `sys.path.insert(...)` carry
+  `# noqa: E402`; library imports go above it.
 
 ### How decisions are made on this project
 
