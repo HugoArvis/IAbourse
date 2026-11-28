@@ -1,0 +1,4 @@
+# Code formatter (PEP 8 compliant). Run: python -m black <files>
+[tool.black]
+line-length = 79
+skip-string-normalization = true

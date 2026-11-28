@@ -31,7 +31,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from membership.build_membership import (  # noqa: E402
-    assign_company_ids, load_holdings,
+    assign_company_ids,
+    load_holdings,
 )
 from prices.download import SOURCES, load  # noqa: E402
 from prices.validate import TOLERANCE, price_on, unadjusted_close  # noqa: E402
@@ -40,8 +41,8 @@ from sources import sec  # noqa: E402
 CACHE = ROOT / "cache"
 OUT = CACHE / "successor_links.parquet"
 FORMS = r"8-K12[BG]3?(/A)?"
-MIN_MATCHES = 3   # snapshots where S's price equals P's actual price
-MIN_SHARE = 0.8   # ... out of the snapshots where S has a price
+MIN_MATCHES = 3  # snapshots where S's price equals P's actual price
+MIN_SHARE = 0.8  # ... out of the snapshots where S has a price
 
 
 def succession_filings(ciks) -> pd.DataFrame:
@@ -50,8 +51,11 @@ def succession_filings(ciks) -> pd.DataFrame:
         f = sec.filings(cik)
         for r in f[f["form"].str.fullmatch(FORMS)].itertuples():
             rows.append((cik, r.form, r.filingDate))
-    return (pd.DataFrame(rows, columns=["cik", "form", "filed"])
-              .drop_duplicates(["cik", "filed"]).reset_index(drop=True))
+    return (
+        pd.DataFrame(rows, columns=["cik", "form", "filed"])
+        .drop_duplicates(["cik", "filed"])
+        .reset_index(drop=True)
+    )
 
 
 def _price_continuity(p_rows: pd.DataFrame, tickers, cache: dict) -> tuple:
@@ -91,7 +95,9 @@ def find_links() -> pd.DataFrame:
     cand = pd.read_parquet(CACHE / "price_ticker_candidates.parquet")
     tickers = cand.groupby("company_id")["ticker"].apply(list)
 
-    filings = succession_filings(sorted(h["cik"].dropna().astype(int).unique()))
+    filings = succession_filings(
+        sorted(h["cik"].dropna().astype(int).unique())
+    )
     cache: dict = {}
     links = []
     for f in filings.itertuples():
@@ -100,15 +106,36 @@ def find_links() -> pd.DataFrame:
         if succ is None or not before or succ not in tickers:
             continue
         for pred in last.index[(last == before[-1]) & (last.index != succ)]:
-            t, src, n_ok, n_px = _price_continuity(h[h["company_id"] == pred], tickers[succ], cache)
+            t, src, n_ok, n_px = _price_continuity(
+                h[h["company_id"] == pred], tickers[succ], cache
+            )
             if n_ok >= MIN_MATCHES and n_ok >= MIN_SHARE * n_px:
-                links.append({"pred": pred, "succ": succ, "cik": f.cik, "form": f.form, "filed": f.filed,
-                              "ticker": t, "source": src, "n_ok": n_ok, "n_px": n_px})
-    return pd.DataFrame(links).drop_duplicates(["pred", "succ"]).reset_index(drop=True)
+                links.append(
+                    {
+                        "pred": pred,
+                        "succ": succ,
+                        "cik": f.cik,
+                        "form": f.form,
+                        "filed": f.filed,
+                        "ticker": t,
+                        "source": src,
+                        "n_ok": n_ok,
+                        "n_px": n_px,
+                    }
+                )
+    return (
+        pd.DataFrame(links)
+        .drop_duplicates(["pred", "succ"])
+        .reset_index(drop=True)
+    )
 
 
 def load_links() -> pd.DataFrame:
-    return pd.read_parquet(OUT) if OUT.exists() else pd.DataFrame(columns=["pred", "succ"])
+    return (
+        pd.read_parquet(OUT)
+        if OUT.exists()
+        else pd.DataFrame(columns=["pred", "succ"])
+    )
 
 
 if __name__ == "__main__":
@@ -116,5 +143,12 @@ if __name__ == "__main__":
     links.to_parquet(OUT)
     names = load_holdings().groupby("entity")["name"].last()
     print(f"{len(links)} successor links")
-    print(links.assign(pred=links["pred"].map(names), succ=links["succ"].map(names))
-          [["filed", "form", "pred", "succ", "ticker", "n_ok", "n_px"]].to_string(index=False))
+    print(
+        links.assign(
+            pred=links["pred"].map(names), succ=links["succ"].map(names)
+        )[
+            ["filed", "form", "pred", "succ", "ticker", "n_ok", "n_px"]
+        ].to_string(
+            index=False
+        )
+    )

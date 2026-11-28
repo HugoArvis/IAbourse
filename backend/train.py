@@ -1,6 +1,7 @@
 """
 Training launcher — run this instead of calling training scripts directly.
 """
+
 import os
 import sys
 
@@ -10,8 +11,7 @@ PROFILES = {
     "1": {
         "name": "LightGBM — Full (all 15 tickers)",
         "description": (
-            "All 15 tickers · 2 horizons (5d / 21d)\n"
-            "  Training time: < 2 min"
+            "All 15 tickers · 2 horizons (5d / 21d)\n  Training time: < 2 min"
         ),
         "tickers": None,
         "n_folds": 5,
@@ -44,8 +44,7 @@ PROFILES = {
     "4": {
         "name": "CatBoost — Full (all 15 tickers)",
         "description": (
-            "All 15 tickers · 2 horizons (5d / 21d)\n"
-            "  Training time: < 5 min"
+            "All 15 tickers · 2 horizons (5d / 21d)\n  Training time: < 5 min"
         ),
         "tickers": None,
         "n_folds": 5,
@@ -54,9 +53,9 @@ PROFILES = {
     "5": {
         "name": "Compare LightGBM vs CatBoost — Full",
         "description": (
-            "60/20/20 temporal split · both models · both horizons\n"
-            "  Val set for model selection · test set for final honest accuracy\n"
-            "  Training time: < 15 min"
+            "60/20/20 temporal split · both models · both horizons\n  Val set"
+            " for model selection · test set for final honest accuracy\n "
+            " Training time: < 15 min"
         ),
         "tickers": None,
         "mode": "compare",
@@ -143,21 +142,27 @@ def pick_profile() -> dict | None:
 
 def _apply_rolling_window(features):
     """Filter features to the last ROLLING_WINDOW_YEARS of data before training.
-    Addresses regime non-stationarity — old dynamics hurt recent-period accuracy."""
+    Addresses regime non-stationarity — old dynamics hurt recent-period accuracy.
+    """
     import pandas as pd
 
     from config import ROLLING_WINDOW_YEARS
+
     if ROLLING_WINDOW_YEARS is None:
         return features
     cutoff = pd.Timestamp.now() - pd.DateOffset(years=ROLLING_WINDOW_YEARS)
     windowed = features[pd.to_datetime(features.index) >= cutoff]
     excluded = len(features) - len(windowed)
-    print(f"  Rolling window ({ROLLING_WINDOW_YEARS}y): {len(windowed):,} rows kept, {excluded:,} older rows excluded\n")
+    print(
+        f"  Rolling window ({ROLLING_WINDOW_YEARS}y): {len(windowed):,} rows"
+        f" kept, {excluded:,} older rows excluded\n"
+    )
     return windowed
 
 
 def apply_tft_profile(profile: dict):
     import config as cfg
+
     cfg.TFT_HIDDEN_SIZE = profile["hidden_size"]
     cfg.TFT_BATCH_SIZE = profile["batch_size"]
     cfg.TFT_MAX_EPOCHS = profile["max_epochs"]
@@ -168,6 +173,7 @@ def apply_tft_profile(profile: dict):
 
 def run_lgbm_all_horizons(features, profile):
     from models.lgbm_model import LGBMModel
+
     for horizon in ("5d", "21d"):
         print(f"\n  Training LightGBM [{horizon}]...")
         m = LGBMModel.train(features, horizon=horizon)
@@ -177,6 +183,7 @@ def run_lgbm_all_horizons(features, profile):
 
 def run_catboost_all_horizons(features, profile):
     from models.catboost_model import CatBoostModel
+
     for horizon in ("5d", "21d"):
         print(f"\n  Training CatBoost [{horizon}]...")
         m = CatBoostModel.train(features, horizon=horizon)
@@ -186,6 +193,7 @@ def run_catboost_all_horizons(features, profile):
 
 def run_tft(features, profile):
     from training.train_supervised import train_supervised
+
     print(f"\n  Training TFT ({profile['n_folds']} fold(s))...")
     return train_supervised(features, n_folds=profile["n_folds"])
 
@@ -195,37 +203,66 @@ def _three_way_split(features):
     import pandas as pd
 
     from training.tune_hyperparams import three_way_split
+
     return three_way_split(features)
 
 
 def _print_comparison_table(results: dict):
     """Regression metrics: direction accuracy, Spearman IC, MAE for both models."""
     print("\n" + "=" * 84)
-    print("  LightGBM vs CatBoost — Regression: predict forward relative return vs SP500")
-    print("  60/20/20 temporal split  |  Val = model selection  |  Test = honest eval")
+    print(
+        "  LightGBM vs CatBoost — Regression: predict forward relative return"
+        " vs SP500"
+    )
+    print(
+        "  60/20/20 temporal split  |  Val = model selection  |  Test = honest"
+        " eval"
+    )
     print("=" * 84)
-    hdr = (f"  {'Horizon':<8} {'Model':<12} {'Val DirAcc':>10}  {'Test DirAcc':>11}  "
-           f"{'IC (test)':>9}  {'MAE%':>6}  {'RMSE%':>6}")
+    hdr = (
+        f"  {'Horizon':<8} {'Model':<12} {'Val DirAcc':>10} "
+        f" {'Test DirAcc':>11}  {'IC (test)':>9}  {'MAE%':>6}  {'RMSE%':>6}"
+    )
     print(hdr)
     print("-" * 84)
 
     for horizon in ("5d", "21d"):
-        for model_name, label in (("lgbm", "LightGBM"), ("catboost", "CatBoost")):
+        for model_name, label in (
+            ("lgbm", "LightGBM"),
+            ("catboost", "CatBoost"),
+        ):
             res = results.get(horizon, {}).get(model_name, {})
             val_da = res.get("val", {}).get("direction_accuracy", float("nan"))
-            test_da = res.get("test", {}).get("direction_accuracy", float("nan"))
+            test_da = res.get("test", {}).get(
+                "direction_accuracy", float("nan")
+            )
             test_ic = res.get("test", {}).get("spearman_ic", float("nan"))
             test_mae = res.get("test", {}).get("mae", float("nan")) * 100
             test_rmse = res.get("test", {}).get("rmse", float("nan")) * 100
-            print(f"  {horizon:<8} {label:<12} {val_da:>9.1%}  {test_da:>10.1%}  "
-                  f"{test_ic:>9.4f}  {test_mae:>5.2f}%  {test_rmse:>5.2f}%")
+            print(
+                f"  {horizon:<8} {label:<12} {val_da:>9.1%}  {test_da:>10.1%} "
+                f" {test_ic:>9.4f}  {test_mae:>5.2f}%  {test_rmse:>5.2f}%"
+            )
         print()
 
     print("-" * 84)
-    print("  IC > 0.02 = useful signal  |  Dir. Acc > 52% = consistent directional edge")
+    print(
+        "  IC > 0.02 = useful signal  |  Dir. Acc > 52% = consistent"
+        " directional edge"
+    )
     for horizon in ("5d", "21d"):
-        lgbm_ic = results.get(horizon, {}).get("lgbm", {}).get("test", {}).get("spearman_ic", 0)
-        cb_ic = results.get(horizon, {}).get("catboost", {}).get("test", {}).get("spearman_ic", 0)
+        lgbm_ic = (
+            results.get(horizon, {})
+            .get("lgbm", {})
+            .get("test", {})
+            .get("spearman_ic", 0)
+        )
+        cb_ic = (
+            results.get(horizon, {})
+            .get("catboost", {})
+            .get("test", {})
+            .get("spearman_ic", 0)
+        )
         if lgbm_ic > cb_ic:
             winner = f"LightGBM  (IC {lgbm_ic:.4f} vs {cb_ic:.4f})"
         elif cb_ic > lgbm_ic:
@@ -246,10 +283,15 @@ def run_comparison(features, profile):
     train_val_df = pd.concat([train_df, val_df])
 
     print(f"\n  Train : up to {train_cut.date()}  ({len(train_df):,} rows)")
-    print(f"  Val   : {train_cut.date()} → {val_cut.date()}  ({len(val_df):,} rows)")
+    print(
+        f"  Val   : {train_cut.date()} → {val_cut.date()}  ({len(val_df):,}"
+        " rows)"
+    )
     print(f"  Test  : from {val_cut.date()}  ({len(test_df):,} rows)\n")
     print("  NOTE: accuracy reported from models trained on 60% (train only).")
-    print("        Saved production models are retrained on 80% (train+val).\n")
+    print(
+        "        Saved production models are retrained on 80% (train+val).\n"
+    )
 
     results = {}
     for horizon in ("5d", "21d"):
@@ -296,14 +338,22 @@ def main():
     if mode == "rl":
         from data.feature_engineering import build_features
         from rl.train_rl import train_rl
+
         print("Building features...")
         features = build_features()
         train_rl(features, total_timesteps=profile["total_timesteps"])
-        print("\n  RL training complete. PPO checkpoint saved to models/checkpoints/ppo_agent.zip")
-        print("  The paper trading pipeline will use the PPO agent automatically from now on.\n")
+        print(
+            "\n  RL training complete. PPO checkpoint saved to"
+            " models/checkpoints/ppo_agent.zip"
+        )
+        print(
+            "  The paper trading pipeline will use the PPO agent automatically"
+            " from now on.\n"
+        )
         return
 
     from data.feature_engineering import build_features
+
     print("Building features...")
     features = build_features()
 
@@ -333,18 +383,32 @@ def main():
 
     elif mode == "compare":
         run_comparison(features, profile)
-        print("\n  Production models saved (trained on 80%). Run profile 7 to tune hyperparameters.\n")
+        print(
+            "\n  Production models saved (trained on 80%). Run profile 7 to"
+            " tune hyperparameters.\n"
+        )
 
     elif mode == "tune":
         from training.tune_hyperparams import run_tuning
-        run_tuning(features, n_lgbm=profile["n_lgbm"], n_catboost=profile["n_catboost"])
-        print("\n  Tuning complete. Re-run profile 1 or 5 to train/compare with best params.\n")
+
+        run_tuning(
+            features,
+            n_lgbm=profile["n_lgbm"],
+            n_catboost=profile["n_catboost"],
+        )
+        print(
+            "\n  Tuning complete. Re-run profile 1 or 5 to train/compare with"
+            " best params.\n"
+        )
 
     elif mode == "tft":
         apply_tft_profile(profile)
         model = run_tft(features, profile)
         if model:
-            print("\n  TFT training complete. Checkpoint saved to models/checkpoints/")
+            print(
+                "\n  TFT training complete. Checkpoint saved to"
+                " models/checkpoints/"
+            )
             print("  Next step: py training/evaluate.py\n")
         else:
             print("\n  Training produced no model — check errors above.\n")

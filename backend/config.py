@@ -8,7 +8,9 @@ load_dotenv()
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
-ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+ALPACA_BASE_URL = os.getenv(
+    "ALPACA_BASE_URL", "https://paper-api.alpaca.markets"
+)
 
 # ── Trading universe ───────────────────────────────────────────────────────────
 # Expanded from 15 to 78 tickers: diverse sectors + market caps + sector ETFs.
@@ -16,40 +18,120 @@ ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets
 # generalisation across market regimes. ETFs act as clean regime anchors.
 TICKERS = [
     # ── Large-cap US equities (original universe) ──────────────────
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META",
-    "NVDA", "TSLA", "JPM", "V", "JNJ",
-    "XOM", "UNH", "PG", "HD", "MA",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "NVDA",
+    "TSLA",
+    "JPM",
+    "V",
+    "JNJ",
+    "XOM",
+    "UNH",
+    "PG",
+    "HD",
+    "MA",
     # ── Technology ─────────────────────────────────────────────────
-    "AMD", "AVGO", "QCOM", "CRM", "ADBE",
-    "ORCL", "CSCO", "TXN", "NOW", "INTC",
+    "AMD",
+    "AVGO",
+    "QCOM",
+    "CRM",
+    "ADBE",
+    "ORCL",
+    "CSCO",
+    "TXN",
+    "NOW",
+    "INTC",
     # ── Healthcare ─────────────────────────────────────────────────
-    "LLY", "ABBV", "MRK", "PFE", "ABT", "CVS", "MDT",
+    "LLY",
+    "ABBV",
+    "MRK",
+    "PFE",
+    "ABT",
+    "CVS",
+    "MDT",
     # ── Financials ─────────────────────────────────────────────────
-    "BAC", "GS", "WFC", "BRK-B", "AXP", "MS", "BLK",
+    "BAC",
+    "GS",
+    "WFC",
+    "BRK-B",
+    "AXP",
+    "MS",
+    "BLK",
     # ── Consumer Discretionary ─────────────────────────────────────
-    "MCD", "NKE", "SBUX", "BKNG", "TJX",
+    "MCD",
+    "NKE",
+    "SBUX",
+    "BKNG",
+    "TJX",
     # ── Consumer Staples ───────────────────────────────────────────
-    "KO", "PEP", "WMT", "COST", "CL",
+    "KO",
+    "PEP",
+    "WMT",
+    "COST",
+    "CL",
     # ── Energy ─────────────────────────────────────────────────────
-    "CVX", "COP", "EOG",
+    "CVX",
+    "COP",
+    "EOG",
     # ── Industrials ────────────────────────────────────────────────
-    "BA", "HON", "CAT", "RTX", "UPS",
+    "BA",
+    "HON",
+    "CAT",
+    "RTX",
+    "UPS",
     # ── Communications ─────────────────────────────────────────────
-    "DIS", "NFLX", "CMCSA", "VZ",
+    "DIS",
+    "NFLX",
+    "CMCSA",
+    "VZ",
     # ── Materials / Utilities ──────────────────────────────────────
-    "LIN", "NEE",
+    "LIN",
+    "NEE",
     # ── Sector & factor ETFs ───────────────────────────────────────
-    "XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE",
-    "GLD", "TLT", "QQQ", "IWM", "HYG",
+    "XLK",
+    "XLF",
+    "XLE",
+    "XLV",
+    "XLI",
+    "XLY",
+    "XLP",
+    "XLU",
+    "XLB",
+    "XLRE",
+    "GLD",
+    "TLT",
+    "QQQ",
+    "IWM",
+    "HYG",
 ]
 
 # Tickers for which we actually generate BUY/SELL/HOLD signals — equities only.
 # ETFs are in TICKERS (fetched, used as cross-sectional features) but excluded here
 # because their low volatility skews labels toward HOLD and dilutes the training signal.
-EQUITY_TICKERS = [t for t in TICKERS if t not in {
-    "XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE",
-    "GLD", "TLT", "QQQ", "IWM", "HYG",
-}]
+EQUITY_TICKERS = [
+    t
+    for t in TICKERS
+    if t not in {
+        "XLK",
+        "XLF",
+        "XLE",
+        "XLV",
+        "XLI",
+        "XLY",
+        "XLP",
+        "XLU",
+        "XLB",
+        "XLRE",
+        "GLD",
+        "TLT",
+        "QQQ",
+        "IWM",
+        "HYG",
+    }
+]
 
 PRIMARY_TICKER = "AAPL"
 
@@ -58,22 +140,22 @@ MACRO_TICKERS = ["^VIX", "^TNX", "DX-Y.NYB", "GC=F", "^GSPC"]
 
 # Data parameters
 PRICE_HISTORY_YEARS = 10
-ENCODER_LENGTH = 60       # days of lookback for TFT
-PREDICTION_HORIZON = 5    # days forward for label
+ENCODER_LENGTH = 60  # days of lookback for TFT
+PREDICTION_HORIZON = 5  # days forward for label
 
 # Labelling thresholds (relative to SP500)
-SELL_THRESHOLD = -0.015   # -1.5%
-BUY_THRESHOLD = 0.015     # +1.5%
+SELL_THRESHOLD = -0.015  # -1.5%
+BUY_THRESHOLD = 0.015  # +1.5%
 LABEL_MAP = {0: "SELL", 1: "HOLD", 2: "BUY"}
 CLASS_WEIGHTS = {0: 2.0, 1: 1.0, 2: 2.0}  # SELL, HOLD, BUY
 
 # Crisis periods for training oversampling and evaluation segmentation
 CRISIS_PERIODS = [
-    ("2008-09-01", "2009-03-31"),   # Global Financial Crisis
-    ("2011-08-01", "2011-10-31"),   # EU Debt Crisis
-    ("2018-10-01", "2018-12-31"),   # Q4 2018 selloff
-    ("2020-02-01", "2020-04-30"),   # COVID crash
-    ("2022-01-01", "2022-10-15"),   # Rate-hike bear market
+    ("2008-09-01", "2009-03-31"),  # Global Financial Crisis
+    ("2011-08-01", "2011-10-31"),  # EU Debt Crisis
+    ("2018-10-01", "2018-12-31"),  # Q4 2018 selloff
+    ("2020-02-01", "2020-04-30"),  # COVID crash
+    ("2022-01-01", "2022-10-15"),  # Rate-hike bear market
 ]
 RECOVERY_PERIODS = [
     ("2009-04-01", "2009-12-31"),
@@ -82,7 +164,8 @@ RECOVERY_PERIODS = [
     ("2020-05-01", "2020-12-31"),
     ("2022-10-16", "2023-06-30"),
 ]
-CRISIS_SAMPLE_WEIGHT = 5.0   # multiplier applied to crisis-period rows during training
+# multiplier applied to crisis-period rows during training
+CRISIS_SAMPLE_WEIGHT = 5.0
 
 # TFT hyperparameters
 TFT_HIDDEN_SIZE = 32
@@ -108,15 +191,19 @@ PPO_ENT_COEF = 0.01
 PPO_TOTAL_TIMESTEPS = 1_000_000
 
 # Risk rules
-MAX_PORTFOLIO_DRAWDOWN = 0.20   # 20% stop-loss (hard limit — never bypass)
-MAX_POSITION_PCT = 1.0          # 100% per ticker — paper trading, model decides sizing
-CONFIDENCE_THRESHOLD = 0.05     # very low: trade on any meaningful signal
-MIN_AVG_VOLUME = 1_000_000      # shares/day
-EARNINGS_BLACKOUT_HOURS = 24    # hours before earnings
+MAX_PORTFOLIO_DRAWDOWN = 0.20  # 20% stop-loss (hard limit — never bypass)
+# 100% per ticker — paper trading, model decides sizing
+MAX_POSITION_PCT = 1.0
+CONFIDENCE_THRESHOLD = 0.05  # very low: trade on any meaningful signal
+MIN_AVG_VOLUME = 1_000_000  # shares/day
+EARNINGS_BLACKOUT_HOURS = 24  # hours before earnings
 DRAWDOWN_PENALTY_THRESHOLD = 0.15
-MAX_OPEN_POSITIONS = 5          # max simultaneous long positions across all tickers
-MAX_PER_SECTOR = 2              # max tickers from the same sector in the portfolio
-STOP_LOSS_PCT = -0.08           # -8% unrealized loss → close position immediately
+# max simultaneous long positions across all tickers
+MAX_OPEN_POSITIONS = 5
+# max tickers from the same sector in the portfolio
+MAX_PER_SECTOR = 2
+# -8% unrealized loss → close position immediately
+STOP_LOSS_PCT = -0.08
 
 # Score / position formula constants
 SCORE_NEUTRAL = 5.0
@@ -131,35 +218,82 @@ MAX_PREDICTED_RETURN = 0.015
 # Sector classification for concentration constraint (covers all 63 EQUITY_TICKERS)
 SECTOR_MAP = {
     # Technology (16)
-    "AAPL": "tech", "MSFT": "tech", "GOOGL": "tech", "AMZN": "tech", "META": "tech",
-    "NVDA": "tech", "AMD": "tech", "AVGO": "tech", "QCOM": "tech", "CRM": "tech",
-    "ADBE": "tech", "ORCL": "tech", "CSCO": "tech", "TXN": "tech", "NOW": "tech", "INTC": "tech",
+    "AAPL": "tech",
+    "MSFT": "tech",
+    "GOOGL": "tech",
+    "AMZN": "tech",
+    "META": "tech",
+    "NVDA": "tech",
+    "AMD": "tech",
+    "AVGO": "tech",
+    "QCOM": "tech",
+    "CRM": "tech",
+    "ADBE": "tech",
+    "ORCL": "tech",
+    "CSCO": "tech",
+    "TXN": "tech",
+    "NOW": "tech",
+    "INTC": "tech",
     # Healthcare (9)
-    "JNJ": "healthcare", "UNH": "healthcare", "LLY": "healthcare", "ABBV": "healthcare",
-    "MRK": "healthcare", "PFE": "healthcare", "ABT": "healthcare", "CVS": "healthcare", "MDT": "healthcare",
+    "JNJ": "healthcare",
+    "UNH": "healthcare",
+    "LLY": "healthcare",
+    "ABBV": "healthcare",
+    "MRK": "healthcare",
+    "PFE": "healthcare",
+    "ABT": "healthcare",
+    "CVS": "healthcare",
+    "MDT": "healthcare",
     # Financials (10)
-    "JPM": "financials", "V": "financials", "MA": "financials", "BAC": "financials",
-    "GS": "financials", "WFC": "financials", "BRK-B": "financials", "AXP": "financials",
-    "MS": "financials", "BLK": "financials",
+    "JPM": "financials",
+    "V": "financials",
+    "MA": "financials",
+    "BAC": "financials",
+    "GS": "financials",
+    "WFC": "financials",
+    "BRK-B": "financials",
+    "AXP": "financials",
+    "MS": "financials",
+    "BLK": "financials",
     # Consumer Discretionary (7)
-    "TSLA": "consumer_disc", "HD": "consumer_disc", "MCD": "consumer_disc",
-    "NKE": "consumer_disc", "SBUX": "consumer_disc", "BKNG": "consumer_disc", "TJX": "consumer_disc",
+    "TSLA": "consumer_disc",
+    "HD": "consumer_disc",
+    "MCD": "consumer_disc",
+    "NKE": "consumer_disc",
+    "SBUX": "consumer_disc",
+    "BKNG": "consumer_disc",
+    "TJX": "consumer_disc",
     # Consumer Staples (6)
-    "PG": "consumer_staples", "KO": "consumer_staples", "PEP": "consumer_staples",
-    "WMT": "consumer_staples", "COST": "consumer_staples", "CL": "consumer_staples",
+    "PG": "consumer_staples",
+    "KO": "consumer_staples",
+    "PEP": "consumer_staples",
+    "WMT": "consumer_staples",
+    "COST": "consumer_staples",
+    "CL": "consumer_staples",
     # Energy (4)
-    "XOM": "energy", "CVX": "energy", "COP": "energy", "EOG": "energy",
+    "XOM": "energy",
+    "CVX": "energy",
+    "COP": "energy",
+    "EOG": "energy",
     # Industrials (5)
-    "BA": "industrials", "HON": "industrials", "CAT": "industrials", "RTX": "industrials", "UPS": "industrials",
+    "BA": "industrials",
+    "HON": "industrials",
+    "CAT": "industrials",
+    "RTX": "industrials",
+    "UPS": "industrials",
     # Communications (4)
-    "DIS": "communications", "NFLX": "communications", "CMCSA": "communications", "VZ": "communications",
+    "DIS": "communications",
+    "NFLX": "communications",
+    "CMCSA": "communications",
+    "VZ": "communications",
     # Materials / Utilities (2)
-    "LIN": "materials", "NEE": "utilities",
+    "LIN": "materials",
+    "NEE": "utilities",
 }
 
 # Temporal sample weighting — exponential decay half-life in days
 # Recent data weighted ~1.0; data HALF_LIFE days ago weighted ~0.5
-TEMPORAL_WEIGHT_HALF_LIFE = 252   # ~1 trading year
+TEMPORAL_WEIGHT_HALF_LIFE = 252  # ~1 trading year
 
 # Rolling training window — only train on the last N years of data.
 # Older data describes market regimes that no longer apply and hurts out-of-sample

@@ -23,20 +23,27 @@ class RLScorer:
 
     def __init__(self):
         self._ppo = None
-        self._base = None   # MultiHorizonScorer
+        self._base = None  # MultiHorizonScorer
 
     def load(self) -> "RLScorer":
         from models.strategy_scorer import MultiHorizonScorer
+
         self._base = MultiHorizonScorer().load()
 
-        ckpt = self._CKPT if os.path.exists(self._CKPT) else (
-            self._CKPT_BEST if os.path.exists(self._CKPT_BEST) else None)
+        ckpt = (
+            self._CKPT
+            if os.path.exists(self._CKPT)
+            else (self._CKPT_BEST if os.path.exists(self._CKPT_BEST) else None)
+        )
         if ckpt is None:
-            logger.info("No PPO checkpoint found — RLScorer will use base scorer only")
+            logger.info(
+                "No PPO checkpoint found — RLScorer will use base scorer only"
+            )
             return self
 
         try:
             from stable_baselines3 import PPO
+
             self._ppo = PPO.load(ckpt)
             logger.info(f"PPO agent loaded from {ckpt}")
         except Exception as e:
@@ -52,9 +59,12 @@ class RLScorer:
     def rl_active(self) -> bool:
         return self._ppo is not None
 
-    def score(self, features: pd.DataFrame,
-              current_position_pct: float = 0.0,
-              episode_drawdown: float = 0.0) -> dict:
+    def score(
+        self,
+        features: pd.DataFrame,
+        current_position_pct: float = 0.0,
+        episode_drawdown: float = 0.0,
+    ) -> dict:
         """
         Returns the same dict structure as MultiHorizonScorer.score().
         If the PPO checkpoint is loaded, it overrides the position decision.
@@ -67,23 +77,26 @@ class RLScorer:
 
         # Build 8-dim observation for PPO
         last = features.iloc[-1]
-        pred_5d = result["predicted_return_5d"] / 100.0   # % → fraction
+        pred_5d = result["predicted_return_5d"] / 100.0  # % → fraction
         pred_21d = result["predicted_return_21d"] / 100.0
         confidence = result["confidence"]
         stress = result["stress"]
         vix_z = float(last.get("vix_z", 0.0))
         mkt_dd = float(last.get("market_drawdown", 0.0))
 
-        obs = np.array([
-            np.clip(pred_5d / MAX_PREDICTED_RETURN, -3.0, 3.0),
-            np.clip(pred_21d / MAX_PREDICTED_RETURN, -3.0, 3.0),
-            confidence,
-            np.clip(vix_z / 3.0, -3.0, 3.0),
-            np.clip(mkt_dd / 0.5, -2.0, 0.0),
-            stress,
-            np.clip(current_position_pct / 100.0, -1.0, 1.0),
-            -np.clip(episode_drawdown, 0.0, 1.0),
-        ], dtype=np.float32)
+        obs = np.array(
+            [
+                np.clip(pred_5d / MAX_PREDICTED_RETURN, -3.0, 3.0),
+                np.clip(pred_21d / MAX_PREDICTED_RETURN, -3.0, 3.0),
+                confidence,
+                np.clip(vix_z / 3.0, -3.0, 3.0),
+                np.clip(mkt_dd / 0.5, -2.0, 0.0),
+                stress,
+                np.clip(current_position_pct / 100.0, -1.0, 1.0),
+                -np.clip(episode_drawdown, 0.0, 1.0),
+            ],
+            dtype=np.float32,
+        )
 
         try:
             action, _ = self._ppo.predict(obs, deterministic=True)
@@ -91,10 +104,15 @@ class RLScorer:
             score = round(5.0 + (position_pct / 100.0) * 5.0, 2)
 
             from models.strategy_scorer import _strategy_text
+
             strategy = _strategy_text(pred_21d, confidence, stress)
 
-            result = {**result, "score": score, "position_pct": round(position_pct, 1),
-                      "strategy": f"[RL] {strategy}"}
+            result = {
+                **result,
+                "score": score,
+                "position_pct": round(position_pct, 1),
+                "strategy": f"[RL] {strategy}",
+            }
         except Exception as e:
             logger.error(f"PPO predict failed: {e}")
 

@@ -9,13 +9,17 @@ from torch.utils.data import WeightedRandomSampler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (  # noqa: E402
-    ENCODER_LENGTH, PREDICTION_HORIZON, TEMPORAL_WEIGHT_HALF_LIFE,
+    ENCODER_LENGTH,
+    PREDICTION_HORIZON,
+    TEMPORAL_WEIGHT_HALF_LIFE,
     TFT_BATCH_SIZE,
 )
 from data.feature_engineering import FEATURE_COLUMNS  # noqa: E402
 
 
-def build_timeseries_dataset(features: pd.DataFrame, cutoff_date: str | None = None):
+def build_timeseries_dataset(
+    features: pd.DataFrame, cutoff_date: str | None = None
+):
     """
     Build a pytorch-forecasting TimeSeriesDataSet for 3-class classification.
     cutoff_date: if set, only use data before this date (walk-forward safe).
@@ -30,12 +34,17 @@ def build_timeseries_dataset(features: pd.DataFrame, cutoff_date: str | None = N
     df = df.reset_index()
     df.rename(columns={df.columns[0]: "date"}, inplace=True)
     df["time_idx"] = (df["date"] - df["date"].min()).dt.days.astype(int)
-    df["group"] = df["ticker"].astype(str) if "ticker" in df.columns else "default"
+    df["group"] = (
+        df["ticker"].astype(str) if "ticker" in df.columns else "default"
+    )
 
     # Integer labels 0/1/2 → NaNLabelEncoder tells pytorch-forecasting this is classification
-    df["label"] = df["label"].astype(int).astype(str)  # NaNLabelEncoder needs strings
+    # NaNLabelEncoder needs strings
+    df["label"] = df["label"].astype(int).astype(str)
 
-    feat_cols = [c for c in FEATURE_COLUMNS if c in df.columns and c != "label"]
+    feat_cols = [
+        c for c in FEATURE_COLUMNS if c in df.columns and c != "label"
+    ]
 
     # Fill any NaNs in feature columns so the dataset doesn't reject rows
     df[feat_cols] = df[feat_cols].fillna(0.0)
@@ -59,17 +68,23 @@ def build_timeseries_dataset(features: pd.DataFrame, cutoff_date: str | None = N
     return dataset
 
 
-def build_weighted_train_dataloader(dataset, batch_size: int | None = None, half_life: int | None = None):
+def build_weighted_train_dataloader(
+    dataset, batch_size: int | None = None, half_life: int | None = None
+):
     """
     Training DataLoader with exponential decay sample weights.
     Sequences ending on more recent dates are sampled more often.
     Validation DataLoaders should always use the plain to_dataloader(train=False).
     """
-    half_life = half_life if half_life is not None else TEMPORAL_WEIGHT_HALF_LIFE
+    half_life = (
+        half_life if half_life is not None else TEMPORAL_WEIGHT_HALF_LIFE
+    )
     batch_size = batch_size or TFT_BATCH_SIZE
 
     if half_life is None:
-        return dataset.to_dataloader(train=True, batch_size=batch_size, num_workers=0)
+        return dataset.to_dataloader(
+            train=True, batch_size=batch_size, num_workers=0
+        )
 
     # dataset.index is a DataFrame where each row = one training sequence.
     # time_idx corresponds to the *start* of the encoder window; adding
@@ -82,16 +97,22 @@ def build_weighted_train_dataloader(dataset, batch_size: int | None = None, half
     weights = np.exp(-decay * (max_end - end_idx).values)
     weights = torch.FloatTensor(weights)
 
-    sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+    sampler = WeightedRandomSampler(
+        weights, num_samples=len(weights), replacement=True
+    )
     logger.info(
         f"Weighted sampler: half_life={half_life}d, "
         f"weight range [{weights.min():.3f}, {weights.max():.3f}]"
     )
     # Pass sampler; shuffle must be False when a sampler is provided
-    return dataset.to_dataloader(train=False, batch_size=batch_size, num_workers=0, sampler=sampler)
+    return dataset.to_dataloader(
+        train=False, batch_size=batch_size, num_workers=0, sampler=sampler
+    )
 
 
 def build_inference_dataloader(features: pd.DataFrame, batch_size: int = 1):
     """Build a single-sample dataloader for live inference on the latest window."""
     dataset = build_timeseries_dataset(features)
-    return dataset.to_dataloader(train=False, batch_size=batch_size, num_workers=0)
+    return dataset.to_dataloader(
+        train=False, batch_size=batch_size, num_workers=0
+    )

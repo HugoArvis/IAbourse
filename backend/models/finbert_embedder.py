@@ -9,13 +9,18 @@ class FinBERTEmbedder:
 
     def __init__(self, device: str | None = None):
         from transformers import (
-            AutoModelForSequenceClassification, AutoTokenizer,
+            AutoModelForSequenceClassification,
+            AutoTokenizer,
         )
 
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device or (
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         logger.info(f"Loading FinBERT on {self.device}...")
         self.tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME)
-        self.model = AutoModelForSequenceClassification.from_pretrained(_MODEL_NAME)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            _MODEL_NAME
+        )
         self.model.to(self.device)
         self.model.eval()
         # FinBERT label order: positive=0, negative=1, neutral=2
@@ -23,10 +28,12 @@ class FinBERTEmbedder:
         logger.info("FinBERT loaded")
 
     @torch.no_grad()
-    def score_batch(self, texts: list[str], batch_size: int = 32) -> list[dict]:
+    def score_batch(
+        self, texts: list[str], batch_size: int = 32
+    ) -> list[dict]:
         results = []
         for i in range(0, len(texts), batch_size):
-            batch = texts[i: i + batch_size]
+            batch = texts[i : i + batch_size]
             enc = self.tokenizer(
                 batch,
                 padding=True,
@@ -37,11 +44,13 @@ class FinBERTEmbedder:
             logits = self.model(**enc).logits
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
             for row in probs:
-                results.append({
-                    "positive": float(row[0]),
-                    "negative": float(row[1]),
-                    "neutral": float(row[2]),
-                })
+                results.append(
+                    {
+                        "positive": float(row[0]),
+                        "negative": float(row[1]),
+                        "neutral": float(row[2]),
+                    }
+                )
         return results
 
     def score(self, text: str) -> dict:

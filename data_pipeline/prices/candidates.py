@@ -22,14 +22,19 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from membership.build_membership import (  # noqa: E402
-    assign_company_ids, load_holdings,
+    assign_company_ids,
+    load_holdings,
 )
 from membership.entity_match import normalize  # noqa: E402
 from membership.tickers import (  # noqa: E402
-    historical_ticker_names, ic_with_cik, key, ticker_to_cik,
+    historical_ticker_names,
+    ic_with_cik,
+    key,
+    ticker_to_cik,
 )
 from membership.wiki_sources import (  # noqa: E402
-    hanshof_ticker_periods, load_hanshof,
+    hanshof_ticker_periods,
+    load_hanshof,
 )
 from sources import sec  # noqa: E402
 
@@ -43,13 +48,17 @@ def sec_primary_tickers() -> pd.DataFrame:
     The SEC file also lists preferreds / secondary lines under the same CIK
     (e.g. FMCC plus FMCCG, FMCCH...): only the first entry is kept.
     """
-    data = json.loads(sec.get("https://www.sec.gov/files/company_tickers.json"))
+    data = json.loads(
+        sec.get("https://www.sec.gov/files/company_tickers.json")
+    )
     df = pd.DataFrame(data.values()).rename(columns={"cik_str": "cik"})
     df["ticker"] = df["ticker"].map(key)
     return df.drop_duplicates("cik")[["cik", "ticker", "title"]]
 
 
-def _fallback_candidates(holdings: pd.DataFrame, have: set, periods: pd.DataFrame) -> pd.DataFrame:
+def _fallback_candidates(
+    holdings: pd.DataFrame, have: set, periods: pd.DataFrame
+) -> pd.DataFrame:
     """Candidates for companies the CIK mappings left without any ticker.
 
     A ticker maps to a single CIK above, so when two entities shared it (Allergan Inc.
@@ -67,13 +76,21 @@ def _fallback_candidates(holdings: pd.DataFrame, have: set, periods: pd.DataFram
 
     names = historical_ticker_names(periods, fetch=False)
     names["key"] = names["name"].map(normalize)
-    span = missing.groupby(["company_id", "key"])["date"].agg(["min", "max"]).reset_index()
+    span = (
+        missing.groupby(["company_id", "key"])["date"]
+        .agg(["min", "max"])
+        .reset_index()
+    )
     for s in span.itertuples():
-        near = names[(names["first_seen"] <= s.max) & (names["last_seen"] >= s.min)]
+        near = names[
+            (names["first_seen"] <= s.max) & (names["last_seen"] >= s.min)
+        ]
         for t, k in zip(near["ticker"], near["key"]):
             if fuzz.token_sort_ratio(k, s.key) >= NAME_MATCH:
                 rows.append((s.company_id, key(t), "name_period"))
-    return pd.DataFrame(rows, columns=["company_id", "ticker", "source"]).assign(entity=None)
+    return pd.DataFrame(
+        rows, columns=["company_id", "ticker", "source"]
+    ).assign(entity=None)
 
 
 def build_candidates() -> pd.DataFrame:
@@ -105,21 +122,52 @@ def build_candidates() -> pd.DataFrame:
     holdings["company_id"] = holdings["entity"].map(company)
     missing = holdings[~holdings["company_id"].isin(cand["company_id"])]
 
-    def compact(name_key: str) -> str:  # "EXXONMOBIL HOLDINGS" == "EXXON MOBIL"
-        return name_key.replace("HOLDINGS", "").replace("GROUP", "").replace(" ", "")
+    # "EXXONMOBIL HOLDINGS" == "EXXON MOBIL"
+    def compact(name_key: str) -> str:
+        return (
+            name_key.replace("HOLDINGS", "")
+            .replace("GROUP", "")
+            .replace(" ", "")
+        )
 
-    by_key = dict(zip(sec_primary["title"].map(lambda t: compact(normalize(t))), sec_primary["ticker"]))
-    extra = [(None, by_key[compact(k)], "sec_name", c)
-             for c, k in missing[["company_id", "key"]].drop_duplicates().itertuples(index=False)
-             if compact(k) in by_key]
+    by_key = dict(
+        zip(
+            sec_primary["title"].map(lambda t: compact(normalize(t))),
+            sec_primary["ticker"],
+        )
+    )
+    extra = [
+        (None, by_key[compact(k)], "sec_name", c)
+        for c, k in (
+            missing[["company_id", "key"]]
+            .drop_duplicates()
+            .itertuples(index=False)
+        )
+        if compact(k) in by_key
+    ]
     if extra:
-        cand = pd.concat([cand, pd.DataFrame(extra, columns=["entity", "ticker", "source", "company_id"])])
-    cand = pd.concat([cand, _fallback_candidates(holdings, set(cand["company_id"]), periods)])
+        cand = pd.concat(
+            [
+                cand,
+                pd.DataFrame(
+                    extra, columns=["entity", "ticker", "source", "company_id"]
+                ),
+            ]
+        )
+    cand = pd.concat(
+        [
+            cand,
+            _fallback_candidates(holdings, set(cand["company_id"]), periods),
+        ]
+    )
     # SEC lists many secondary lines (preferreds, warrants: "BAC-PL", "XYZ.WS"): keep plain symbols
     # plus share classes like BRK.B / BF.B.
     cand = cand[cand["ticker"].str.fullmatch(r"[A-Z]{1,5}(\.[A-Z])?")]
-    return (cand.groupby(["company_id", "ticker"])["source"]
-                .agg(lambda s: ",".join(sorted(set(s)))).reset_index())
+    return (
+        cand.groupby(["company_id", "ticker"])["source"]
+        .agg(lambda s: ",".join(sorted(set(s))))
+        .reset_index()
+    )
 
 
 if __name__ == "__main__":
@@ -127,9 +175,19 @@ if __name__ == "__main__":
     cand.to_parquet(CACHE / "price_ticker_candidates.parquet")
     table = pd.read_parquet(CACHE / "sp500_membership.parquet")
     covered = table["company_id"].isin(cand["company_id"])
-    print(f"candidates: {len(cand)} rows, {cand['ticker'].nunique()} tickers, "
-          f"{cand['company_id'].nunique()} companies")
-    print(f"companies of the membership table with >=1 candidate: {covered.mean():.1%} "
-          f"({(~covered).sum()} without)")
-    print("per company:", cand.groupby("company_id").size().describe().round(1).to_dict())
-    print("no candidate:", table.loc[~covered, "name"].drop_duplicates().head(40).tolist())
+    print(
+        f"candidates: {len(cand)} rows, {cand['ticker'].nunique()} tickers, "
+        f"{cand['company_id'].nunique()} companies"
+    )
+    print(
+        "companies of the membership table with >=1 candidate:"
+        f" {covered.mean():.1%} ({(~covered).sum()} without)"
+    )
+    print(
+        "per company:",
+        cand.groupby("company_id").size().describe().round(1).to_dict(),
+    )
+    print(
+        "no candidate:",
+        table.loc[~covered, "name"].drop_duplicates().head(40).tolist(),
+    )

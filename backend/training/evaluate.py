@@ -6,15 +6,21 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from sklearn.metrics import (
-    accuracy_score, classification_report, cohen_kappa_score,
+    accuracy_score,
+    classification_report,
+    cohen_kappa_score,
 )
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (  # noqa: E402
-    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, RECOVERY_PERIODS,
+    CRISIS_PERIODS,
+    CRISIS_SAMPLE_WEIGHT,
+    RECOVERY_PERIODS,
 )
 from data.feature_engineering import (  # noqa: E402
-    CATEGORICAL_FEATURES, FEATURE_COLUMNS, build_features,
+    CATEGORICAL_FEATURES,
+    FEATURE_COLUMNS,
+    build_features,
 )
 from models.lgbm_model import _HORIZON_MAP  # noqa: E402
 
@@ -28,6 +34,7 @@ def _train_fold(df: pd.DataFrame, horizon: str):
     Features are filled with 0 for NaN (only target NaNs are dropped).
     """
     import lightgbm as lgb
+
     target_col = _TARGET[horizon]
     df = df.dropna(subset=[target_col]).sort_index()
     if len(df) < 50:
@@ -58,11 +65,17 @@ def _train_fold(df: pd.DataFrame, horizon: str):
         verbose=-1,
     )
     X_df = pd.DataFrame(X, columns=FEATURE_COLUMNS)
-    model.fit(X_df, y, sample_weight=sample_weight, categorical_feature=CATEGORICAL_FEATURES)
+    model.fit(
+        X_df,
+        y,
+        sample_weight=sample_weight,
+        categorical_feature=CATEGORICAL_FEATURES,
+    )
     return model, target_col
 
 
 # ── Regime-aware metrics ─────────────────────────────────────────────────────
+
 
 def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
     """
@@ -77,45 +90,68 @@ def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
     # SELL recall on crash periods
     crisis_mask = pd.Series(False, index=idx)
     for start, end in CRISIS_PERIODS:
-        crisis_mask |= (idx >= pd.Timestamp(start)) & (idx <= pd.Timestamp(end))
+        crisis_mask |= (idx >= pd.Timestamp(start)) & (
+            idx <= pd.Timestamp(end)
+        )
 
     n_crisis = int(crisis_mask.sum())
     if n_crisis > 0:
         sell_recall = recall_score(
             labels[crisis_mask.values].values,
             preds[crisis_mask.values].values,
-            labels=[0], average="macro", zero_division=0,
+            labels=[0],
+            average="macro",
+            zero_division=0,
         )
         results["sell_recall_crisis"] = round(sell_recall, 3)
         results["n_crisis_days"] = n_crisis
-        logger.info(f"SELL recall (crash periods): {sell_recall:.3f}  ({n_crisis} days)")
+        logger.info(
+            f"SELL recall (crash periods): {sell_recall:.3f}  ({n_crisis}"
+            " days)"
+        )
     else:
-        logger.warning("No crisis-period days in validation set — SELL recall not computed")
+        logger.warning(
+            "No crisis-period days in validation set — SELL recall not"
+            " computed"
+        )
 
     # BUY recall on recovery periods
     recovery_mask = pd.Series(False, index=idx)
     for start, end in RECOVERY_PERIODS:
-        recovery_mask |= (idx >= pd.Timestamp(start)) & (idx <= pd.Timestamp(end))
+        recovery_mask |= (idx >= pd.Timestamp(start)) & (
+            idx <= pd.Timestamp(end)
+        )
 
     n_recovery = int(recovery_mask.sum())
     if n_recovery > 0:
         buy_recall = recall_score(
             labels[recovery_mask.values].values,
             preds[recovery_mask.values].values,
-            labels=[2], average="macro", zero_division=0,
+            labels=[2],
+            average="macro",
+            zero_division=0,
         )
         results["buy_recall_recovery"] = round(buy_recall, 3)
         results["n_recovery_days"] = n_recovery
-        logger.info(f"BUY recall (recovery periods): {buy_recall:.3f}  ({n_recovery} days)")
+        logger.info(
+            f"BUY recall (recovery periods): {buy_recall:.3f}  ({n_recovery}"
+            " days)"
+        )
     else:
-        logger.warning("No recovery-period days in validation set — BUY recall not computed")
+        logger.warning(
+            "No recovery-period days in validation set — BUY recall not"
+            " computed"
+        )
 
     return results
 
 
 # ── Walk-forward evaluation ───────────────────────────────────────────────────
 
-def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_folds: int = 5) -> dict:
+
+def walk_forward_evaluate(
+    features_df: pd.DataFrame, horizon: str = "5d", n_folds: int = 5
+) -> dict:
     """
     Proper walk-forward: train on the first k folds, test on fold k+1.
     Guarantees no data leakage and matches production conditions.
@@ -127,10 +163,14 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
 
     for fold in range(1, n_folds + 1):
         train_end = all_dates[fold_size * fold - 1]
-        val_end = all_dates[min(fold_size * (fold + 1) - 1, len(all_dates) - 1)]
+        val_end = all_dates[
+            min(fold_size * (fold + 1) - 1, len(all_dates) - 1)
+        ]
 
         train_df = features_df[features_df.index <= train_end]
-        val_df = features_df[(features_df.index > train_end) & (features_df.index <= val_end)]
+        val_df = features_df[
+            (features_df.index > train_end) & (features_df.index <= val_end)
+        ]
 
         if train_df.empty or val_df.empty:
             logger.warning(f"Fold {fold}: empty split — skipping")
@@ -139,7 +179,9 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
         try:
             model, _ = _train_fold(train_df, horizon)
             if model is None:
-                logger.warning(f"Fold {fold}: too few training samples — skipping")
+                logger.warning(
+                    f"Fold {fold}: too few training samples — skipping"
+                )
                 continue
 
             df_val = val_df.dropna(subset=[target_col])
@@ -152,7 +194,10 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
             preds = model.predict(X_val)
 
             fold_acc = accuracy_score(y_val, preds)
-            logger.info(f"Fold {fold}/{n_folds}: accuracy={fold_acc:.3f}  ({len(y_val)} samples)")
+            logger.info(
+                f"Fold {fold}/{n_folds}: accuracy={fold_acc:.3f} "
+                f" ({len(y_val)} samples)"
+            )
             all_preds.extend(preds.tolist())
             all_labels.extend(y_val.tolist())
             all_idx.extend(df_val.index.tolist())
@@ -167,7 +212,8 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
     overall_acc = accuracy_score(all_labels, all_preds)
     kappa = cohen_kappa_score(all_labels, all_preds)
     report = classification_report(
-        all_labels, all_preds,
+        all_labels,
+        all_preds,
         target_names=["SELL", "HOLD", "BUY"],
         output_dict=True,
         zero_division=0,
@@ -228,21 +274,48 @@ def crisis_stress_test(features_df: pd.DataFrame, horizon: str = "5d") -> dict:
 
     if pre_crash.empty or crash_window.empty:
         logger.warning("Crisis stress test skipped — insufficient date range.")
-        return {"sell_rate": None, "passed": None, "n_days": 0, "skipped": True}
+        return {
+            "sell_rate": None,
+            "passed": None,
+            "n_days": 0,
+            "skipped": True,
+        }
 
     try:
         model, _ = _train_fold(pre_crash, horizon)
         if model is None:
-            logger.warning("Crisis stress test skipped — too few pre-crash samples.")
-            return {"sell_rate": None, "passed": None, "n_days": 0, "skipped": True}
+            logger.warning(
+                "Crisis stress test skipped — too few pre-crash samples."
+            )
+            return {
+                "sell_rate": None,
+                "passed": None,
+                "n_days": 0,
+                "skipped": True,
+            }
     except Exception as e:
-        logger.error(f"Crisis stress test training failed: {e}\n{traceback.format_exc()}")
-        return {"sell_rate": None, "passed": None, "n_days": 0, "skipped": True}
+        logger.error(
+            "Crisis stress test training failed:"
+            f" {e}\n{traceback.format_exc()}"
+        )
+        return {
+            "sell_rate": None,
+            "passed": None,
+            "n_days": 0,
+            "skipped": True,
+        }
 
     df_crash = crash_window.dropna(subset=[target_col])
     if df_crash.empty:
-        logger.warning("Crisis stress test skipped — crash slice empty after dropna.")
-        return {"sell_rate": None, "passed": None, "n_days": 0, "skipped": True}
+        logger.warning(
+            "Crisis stress test skipped — crash slice empty after dropna."
+        )
+        return {
+            "sell_rate": None,
+            "passed": None,
+            "n_days": 0,
+            "skipped": True,
+        }
 
     X = df_crash[FEATURE_COLUMNS].fillna(0).astype(np.float32)
     preds = model.predict(X).tolist()
@@ -256,37 +329,75 @@ def crisis_stress_test(features_df: pd.DataFrame, horizon: str = "5d") -> dict:
         f"SELL rate={sell_rate:.1%} (threshold {CRISIS_SELL_THRESHOLD:.0%}) — "
         f"{'PASS ✓' if passed else 'FAIL — model blind to crash dynamics'}"
     )
-    return {"sell_rate": sell_rate, "passed": passed, "n_days": n_days, "skipped": False}
+    return {
+        "sell_rate": sell_rate,
+        "passed": passed,
+        "n_days": n_days,
+        "skipped": False,
+    }
 
 
 if __name__ == "__main__":
     features = build_features()
 
     # Confirm ~25/50/25 label distribution
-    for col, lbl in [("label", "5d"), ("label_1d", "1d"), ("label_21d", "21d")]:
+    for col, lbl in [
+        ("label", "5d"),
+        ("label_1d", "1d"),
+        ("label_21d", "21d"),
+    ]:
         dist = features[col].value_counts(normalize=True).sort_index()
-        print(f"Label distribution [{lbl}]: SELL={dist.get(0, 0):.1%}  HOLD={dist.get(1, 0):.1%}  BUY={dist.get(2, 0):.1%}")
+        print(
+            f"Label distribution [{lbl}]: SELL={dist.get(0, 0):.1%} "
+            f" HOLD={dist.get(1, 0):.1%}  BUY={dist.get(2, 0):.1%}"
+        )
 
     all_results = {}
-    for hz in ("5d", "21d"):      # 1d dropped — too noisy for directional signals
-        print(f"\n── Walk-forward evaluation [{hz}] ──────────────────────────")
+    # 1d dropped — too noisy for directional signals
+    for hz in ("5d", "21d"):
+        print(
+            f"\n── Walk-forward evaluation [{hz}] ──────────────────────────"
+        )
         results = walk_forward_evaluate(features, horizon=hz)
         all_results[hz] = results
         if results:
             print(f"  Accuracy         : {results['accuracy']:.3f}")
-            print(f"  Kappa            : {results['kappa']:.3f}   (target ≥ 0.10)")
-            print(f"  Active precision : {results['active_precision']:.3f}  (target ≥ 0.40 — avg SELL/BUY precision)")
-            print(f"  Macro F1         : {results['macro_f1']:.3f}   (target ≥ 0.35)")
-            print(f"  Exit criterion   : {'PASS ✓' if results['exit_criterion_met'] else 'FAIL'}")
+            print(
+                f"  Kappa            : {results['kappa']:.3f}   (target ≥"
+                " 0.10)"
+            )
+            print(
+                f"  Active precision : {results['active_precision']:.3f} "
+                " (target ≥ 0.40 — avg SELL/BUY precision)"
+            )
+            print(
+                f"  Macro F1         : {results['macro_f1']:.3f}   (target ≥"
+                " 0.35)"
+            )
+            print(
+                "  Exit criterion   :"
+                f" {'PASS ✓' if results['exit_criterion_met'] else 'FAIL'}"
+            )
             rep = results["report"]
             for cls in ["SELL", "HOLD", "BUY"]:
                 if cls in rep:
                     r = rep[cls]
-                    print(f"    {cls}: prec={r['precision']:.2f}  rec={r['recall']:.2f}  f1={r['f1-score']:.2f}")
+                    print(
+                        f"    {cls}: prec={r['precision']:.2f} "
+                        f" rec={r['recall']:.2f}  f1={r['f1-score']:.2f}"
+                    )
             if "sell_recall_crisis" in results:
-                print(f"  SELL recall on crash periods  : {results['sell_recall_crisis']:.3f}  ({results.get('n_crisis_days', 0)} days)")
+                print(
+                    "  SELL recall on crash periods  :"
+                    f" {results['sell_recall_crisis']:.3f} "
+                    f" ({results.get('n_crisis_days', 0)} days)"
+                )
             if "buy_recall_recovery" in results:
-                print(f"  BUY recall on recovery periods: {results['buy_recall_recovery']:.3f}  ({results.get('n_recovery_days', 0)} days)")
+                print(
+                    "  BUY recall on recovery periods:"
+                    f" {results['buy_recall_recovery']:.3f} "
+                    f" ({results.get('n_recovery_days', 0)} days)"
+                )
 
     print("\n── Crisis stress test [5d] (COVID crash Feb–Apr 2020) ────")
     crisis = crisis_stress_test(features, horizon="5d")
@@ -306,4 +417,7 @@ if __name__ == "__main__":
         and results_21d.get("exit_criterion_met", False)
         and (crisis.get("passed") or crisis.get("skipped"))
     )
-    print(f"═══ Overall: {'READY FOR PHASE 2 ✓' if all_pass else 'NOT READY — address FAILs above'} ═══")
+    print(
+        "═══ Overall:"
+        f" {'READY FOR PHASE 2 ✓' if all_pass else 'NOT READY — address FAILs above'} ═══"
+    )

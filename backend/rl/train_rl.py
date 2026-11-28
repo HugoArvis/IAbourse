@@ -28,17 +28,27 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (  # noqa: E402
-    MODEL_DIR, PPO_BATCH_SIZE, PPO_CLIP_RANGE, PPO_ENT_COEF, PPO_GAE_LAMBDA,
-    PPO_GAMMA, PPO_LR, PPO_N_EPOCHS, PPO_N_STEPS, PPO_TOTAL_TIMESTEPS,
+    MODEL_DIR,
+    PPO_BATCH_SIZE,
+    PPO_CLIP_RANGE,
+    PPO_ENT_COEF,
+    PPO_GAE_LAMBDA,
+    PPO_GAMMA,
+    PPO_LR,
+    PPO_N_EPOCHS,
+    PPO_N_STEPS,
+    PPO_TOTAL_TIMESTEPS,
 )
 from data.feature_engineering import (  # noqa: E402
-    CATEGORICAL_FEATURES, FEATURE_COLUMNS,
+    CATEGORICAL_FEATURES,
+    FEATURE_COLUMNS,
 )
 from rl.callbacks import build_callbacks  # noqa: E402
 from rl.reward_functions import _episode_sharpe  # noqa: E402
 from rl.trading_env import EPISODE_LENGTH, TradingEnv  # noqa: E402
 
 # ── Data preparation ──────────────────────────────────────────────────────────
+
 
 def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
     """
@@ -57,10 +67,14 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
     cb5 = CatBoostModel.load_latest("5d")
 
     if lgbm21 is None:
-        raise RuntimeError("LGBM 21d model not found — run train.py profile 1 or 5 first")
+        raise RuntimeError(
+            "LGBM 21d model not found — run train.py profile 1 or 5 first"
+        )
 
-    logger.info(f"RL data: train up to {train_cut.date()} ({len(train_df):,} rows) | "
-                f"val {train_cut.date()} → {val_cut.date()} ({len(val_df):,} rows)")
+    logger.info(
+        f"RL data: train up to {train_cut.date()} ({len(train_df):,} rows) | "
+        f"val {train_cut.date()} → {val_cut.date()} ({len(val_df):,} rows)"
+    )
 
     def _add_preds(df: pd.DataFrame) -> pd.DataFrame:
         X = df[FEATURE_COLUMNS].fillna(0)
@@ -87,6 +101,7 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
 
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
+
 
 def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
     """
@@ -118,12 +133,17 @@ def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
-def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS) -> PPO:
+
+def train_rl(
+    features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS
+) -> PPO:
     os.makedirs(MODEL_DIR, exist_ok=True)
 
     print("  Preparing RL data (pre-computing model predictions)...")
     train_dict, val_dict = prepare_rl_data(features)
-    print(f"  Train tickers: {len(train_dict)}  |  Val tickers: {len(val_dict)}")
+    print(
+        f"  Train tickers: {len(train_dict)}  |  Val tickers: {len(val_dict)}"
+    )
 
     # DummyVecEnv: works on all platforms (SubprocVecEnv deadlocks on Windows
     # because closure-captured DataFrames can't be pickled across spawn processes)
@@ -150,8 +170,13 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
 
     print(f"\n  Starting PPO training ({total_timesteps:,} timesteps)...")
     print("  Training stats will appear every ~2 048 steps\n")
-    logger.info(f"PPO training: {total_timesteps:,} timesteps · {len(train_dict)} tickers")
-    model.learn(total_timesteps=total_timesteps, callback=callbacks, progress_bar=True)
+    logger.info(
+        f"PPO training: {total_timesteps:,} timesteps · {len(train_dict)}"
+        " tickers"
+    )
+    model.learn(
+        total_timesteps=total_timesteps, callback=callbacks, progress_bar=True
+    )
 
     # Save
     save_path = os.path.join(MODEL_DIR, "ppo_agent")
@@ -165,8 +190,14 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
     print("\n" + "=" * 60)
     print("  PPO Validation Results")
     print("=" * 60)
-    print(f"  Mean Sharpe      : {metrics['mean_sharpe']:.3f}  (exit criterion: > 1.0)")
-    print(f"  Worst Drawdown   : {metrics['worst_drawdown']:.1%}  (exit criterion: < 20%)")
+    print(
+        f"  Mean Sharpe      : {metrics['mean_sharpe']:.3f}  (exit criterion:"
+        " > 1.0)"
+    )
+    print(
+        f"  Worst Drawdown   : {metrics['worst_drawdown']:.1%}  (exit"
+        " criterion: < 20%)"
+    )
     print(f"  Mean Ep. Return  : {metrics['mean_return']:+.2%}")
     print(f"  Episodes run     : {metrics['n_episodes']}")
     print()
@@ -190,5 +221,6 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
 
 if __name__ == "__main__":
     from data.feature_engineering import build_features
+
     features = build_features()
     train_rl(features)

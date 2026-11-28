@@ -24,7 +24,8 @@ class FeatureNoiseCallback(pl.Callback):
         x, _ = batch
         if not isinstance(x, dict) or "encoder_cont" in x is False:
             return
-        enc = x["encoder_cont"]                          # (batch, time, features)
+        # (batch, time, features)
+        enc = x["encoder_cont"]
         # Scale noise by per-feature std so it's proportional to each feature's range
         feat_std = enc.std(dim=(0, 1), keepdim=True).clamp(min=1e-6)
         noise = torch.randn_like(enc) * feat_std * self.noise_std

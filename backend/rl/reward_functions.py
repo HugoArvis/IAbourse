@@ -31,7 +31,8 @@ def _sharpe_incremental(returns: list[float], window: int = 20) -> float:
         return 0.0
     window_returns = returns[-window:]
     mu = np.mean(window_returns)
-    sigma = np.std(window_returns) + 1e-8  # epsilon avoids division by zero on first days
+    # epsilon avoids division by zero on first days
+    sigma = np.std(window_returns) + 1e-8
     return float(mu / sigma)
 
 

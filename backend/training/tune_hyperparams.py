@@ -6,6 +6,7 @@ Best params saved as JSON in MODEL_DIR and auto-loaded by LGBMModel / CatBoostMo
 Usage:
     py training/tune_hyperparams.py
 """
+
 import json
 import os
 import sys
@@ -17,10 +18,14 @@ from loguru import logger
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (  # noqa: E402
-    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE,
+    CRISIS_PERIODS,
+    CRISIS_SAMPLE_WEIGHT,
+    MODEL_DIR,
+    TEMPORAL_WEIGHT_HALF_LIFE,
 )
 from data.feature_engineering import (  # noqa: E402
-    CATEGORICAL_FEATURES, FEATURE_COLUMNS,
+    CATEGORICAL_FEATURES,
+    FEATURE_COLUMNS,
 )
 
 _REGRESSION_TARGETS = {"5d": "relative_return", "21d": "relative_return_21d"}
@@ -28,7 +33,10 @@ _REGRESSION_TARGETS = {"5d": "relative_return", "21d": "relative_return_21d"}
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
-def three_way_split(features: pd.DataFrame, train_pct: float = 0.60, val_pct: float = 0.20):
+
+def three_way_split(
+    features: pd.DataFrame, train_pct: float = 0.60, val_pct: float = 0.20
+):
     """60/20/20 temporal split — no data leakage across boundaries."""
     all_dates = sorted(pd.to_datetime(features.index).unique())
     train_end = all_dates[int(len(all_dates) * train_pct)]
@@ -73,14 +81,20 @@ def load_best_params(model_name: str, horizon: str) -> dict | None:
 
 # ── LightGBM tuning ───────────────────────────────────────────────────────────
 
-def tune_lgbm(train_df: pd.DataFrame, val_df: pd.DataFrame,
-              horizon: str, n_trials: int = 40) -> dict:
+
+def tune_lgbm(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    horizon: str,
+    n_trials: int = 40,
+) -> dict:
     """
     Optuna study for LightGBM. Uses early stopping to find optimal n_estimators.
     Objective: macro-F1 on the validation set (unweighted — real-world performance).
     """
     import lightgbm as lgb
     import optuna
+
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     target_col = _REGRESSION_TARGETS[horizon]
@@ -94,12 +108,18 @@ def tune_lgbm(train_df: pd.DataFrame, val_df: pd.DataFrame,
     y_val = val_df[target_col].astype(np.float32).values
     weights = _compute_weights(train_df)
 
-    cat_indices = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_FEATURES if c in FEATURE_COLUMNS]
+    cat_indices = [
+        FEATURE_COLUMNS.index(c)
+        for c in CATEGORICAL_FEATURES
+        if c in FEATURE_COLUMNS
+    ]
 
     def objective(trial: optuna.Trial) -> float:
         params = dict(
-            n_estimators=1500,   # capped by early stopping
-            learning_rate=trial.suggest_float("learning_rate", 0.005, 0.15, log=True),
+            n_estimators=1500,  # capped by early stopping
+            learning_rate=trial.suggest_float(
+                "learning_rate", 0.005, 0.15, log=True
+            ),
             num_leaves=trial.suggest_int("num_leaves", 31, 127),
             max_depth=trial.suggest_int("max_depth", 4, 9),
             min_child_samples=trial.suggest_int("min_child_samples", 20, 100),
@@ -115,7 +135,8 @@ def tune_lgbm(train_df: pd.DataFrame, val_df: pd.DataFrame,
         )
         model = lgb.LGBMRegressor(**params)
         model.fit(
-            X_train, y_train,
+            X_train,
+            y_train,
             sample_weight=weights,
             categorical_feature=cat_indices,
             eval_set=[(X_val, y_val)],
@@ -128,30 +149,44 @@ def tune_lgbm(train_df: pd.DataFrame, val_df: pd.DataFrame,
         preds = model.predict(X_val)
         # Spearman IC: rank correlation between predicted and actual returns
         from scipy import stats
+
         ic, _ = stats.spearmanr(preds, y_val)
         return float(ic) if not np.isnan(ic) else 0.0
 
-    study = optuna.create_study(direction="maximize",
-                                sampler=optuna.samplers.TPESampler(seed=42))
+    study = optuna.create_study(
+        direction="maximize", sampler=optuna.samplers.TPESampler(seed=42)
+    )
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
     best = study.best_params.copy()
-    best["n_estimators"] = study.best_trial.user_attrs.get("best_iteration", 800)
-    best["n_estimators"] = max(100, int(best["n_estimators"] * 1.05))  # small buffer
-    logger.info(f"LightGBM [{horizon}] best val macro-F1={study.best_value:.4f} | params={best}")
+    best["n_estimators"] = study.best_trial.user_attrs.get(
+        "best_iteration", 800
+    )
+    # small buffer
+    best["n_estimators"] = max(100, int(best["n_estimators"] * 1.05))
+    logger.info(
+        f"LightGBM [{horizon}] best val macro-F1={study.best_value:.4f} |"
+        f" params={best}"
+    )
     return best
 
 
 # ── CatBoost tuning ───────────────────────────────────────────────────────────
 
-def tune_catboost(train_df: pd.DataFrame, val_df: pd.DataFrame,
-                  horizon: str, n_trials: int = 25) -> dict:
+
+def tune_catboost(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    horizon: str,
+    n_trials: int = 25,
+) -> dict:
     """
     Optuna study for CatBoost. Uses early stopping (iterations=1000).
     Objective: macro-F1 on the validation set.
     """
     import optuna
     from catboost import CatBoostRegressor, Pool
+
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     target_col = _REGRESSION_TARGETS[horizon]
@@ -165,17 +200,27 @@ def tune_catboost(train_df: pd.DataFrame, val_df: pd.DataFrame,
     y_val = val_df[target_col].astype(np.float32).values
     weights = _compute_weights(train_df)
 
-    cat_indices = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_FEATURES if c in FEATURE_COLUMNS]
-    train_pool = Pool(X_train, y_train, weight=weights, cat_features=cat_indices)
+    cat_indices = [
+        FEATURE_COLUMNS.index(c)
+        for c in CATEGORICAL_FEATURES
+        if c in FEATURE_COLUMNS
+    ]
+    train_pool = Pool(
+        X_train, y_train, weight=weights, cat_features=cat_indices
+    )
     val_pool = Pool(X_val, y_val, cat_features=cat_indices)
 
     def objective(trial: optuna.Trial) -> float:
         params = dict(
             iterations=1000,
-            learning_rate=trial.suggest_float("learning_rate", 0.005, 0.15, log=True),
+            learning_rate=trial.suggest_float(
+                "learning_rate", 0.005, 0.15, log=True
+            ),
             depth=trial.suggest_int("depth", 4, 8),
             l2_leaf_reg=trial.suggest_float("l2_leaf_reg", 1.0, 10.0),
-            bagging_temperature=trial.suggest_float("bagging_temperature", 0.0, 1.0),
+            bagging_temperature=trial.suggest_float(
+                "bagging_temperature", 0.0, 1.0
+            ),
             loss_function="RMSE",
             random_seed=42,
             verbose=0,
@@ -186,21 +231,27 @@ def tune_catboost(train_df: pd.DataFrame, val_df: pd.DataFrame,
         trial.set_user_attr("best_iteration", model.best_iteration_)
         preds = model.predict(X_val).astype(np.float32)
         from scipy import stats
+
         ic, _ = stats.spearmanr(preds, y_val)
         return float(ic) if not np.isnan(ic) else 0.0
 
-    study = optuna.create_study(direction="maximize",
-                                sampler=optuna.samplers.TPESampler(seed=42))
+    study = optuna.create_study(
+        direction="maximize", sampler=optuna.samplers.TPESampler(seed=42)
+    )
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
 
     best = study.best_params.copy()
     best["iterations"] = study.best_trial.user_attrs.get("best_iteration", 800)
     best["iterations"] = max(100, int(best["iterations"] * 1.05))
-    logger.info(f"CatBoost [{horizon}] best val macro-F1={study.best_value:.4f} | params={best}")
+    logger.info(
+        f"CatBoost [{horizon}] best val macro-F1={study.best_value:.4f} |"
+        f" params={best}"
+    )
     return best
 
 
 # ── Full tuning pipeline ──────────────────────────────────────────────────────
+
 
 def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
     """
@@ -220,7 +271,10 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
     train_val_df = pd.concat([train_df, val_df])
 
     print(f"\n  Train : up to {train_cut.date()}  ({len(train_df):,} rows)")
-    print(f"  Val   : {train_cut.date()} → {val_cut.date()}  ({len(val_df):,} rows)")
+    print(
+        f"  Val   : {train_cut.date()} → {val_cut.date()}  ({len(val_df):,}"
+        " rows)"
+    )
     print(f"  Test  : from {val_cut.date()}  ({len(test_df):,} rows)\n")
 
     summary = {}
@@ -233,7 +287,10 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
         lgbm_params = tune_lgbm(train_df, val_df, horizon, n_trials=n_lgbm)
         save_best_params(lgbm_params, "lgbm", horizon)
 
-        print(f"  [LightGBM {horizon}] Retraining on train+val with best params...")
+        print(
+            f"  [LightGBM {horizon}] Retraining on train+val with best"
+            " params..."
+        )
         lgbm_final = LGBMModel.train(train_val_df, horizon=horizon)
         lgbm_final.save()
         lgbm_result = lgbm_final.evaluate(test_df)
@@ -241,10 +298,15 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
 
         # ── CatBoost ──────────────────────────────────────────────
         print(f"\n  [CatBoost {horizon}] Tuning ({n_catboost} trials)...")
-        cb_params = tune_catboost(train_df, val_df, horizon, n_trials=n_catboost)
+        cb_params = tune_catboost(
+            train_df, val_df, horizon, n_trials=n_catboost
+        )
         save_best_params(cb_params, "catboost", horizon)
 
-        print(f"  [CatBoost {horizon}] Retraining on train+val with best params...")
+        print(
+            f"  [CatBoost {horizon}] Retraining on train+val with best"
+            " params..."
+        )
         cb_final = CatBoostModel.train(train_val_df, horizon=horizon)
         cb_final.save()
         cb_result = cb_final.evaluate(test_df)
@@ -252,9 +314,14 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
 
     # ── Results table ──────────────────────────────────────────────
     print("\n" + "=" * 74)
-    print("  Post-Tuning Test Results (models trained on 80%, evaluated on 20%)")
+    print(
+        "  Post-Tuning Test Results (models trained on 80%, evaluated on 20%)"
+    )
     print("=" * 74)
-    print(f"  {'Horizon':<8} {'Model':<12} {'Dir.Acc':>8}  {'IC':>8}  {'MAE%':>6}  {'RMSE%':>6}")
+    print(
+        f"  {'Horizon':<8} {'Model':<12} {'Dir.Acc':>8}  {'IC':>8} "
+        f" {'MAE%':>6}  {'RMSE%':>6}"
+    )
     print("-" * 74)
     for horizon in ("5d", "21d"):
         for name, label in (("lgbm", "LightGBM"), ("catboost", "CatBoost")):
@@ -263,16 +330,22 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
             ic = res.get("spearman_ic", float("nan"))
             mae = res.get("mae", float("nan")) * 100
             rmse = res.get("rmse", float("nan")) * 100
-            print(f"  {horizon:<8} {label:<12} {da:>7.1%}  {ic:>8.4f}  {mae:>5.2f}%  {rmse:>5.2f}%")
+            print(
+                f"  {horizon:<8} {label:<12} {da:>7.1%}  {ic:>8.4f} "
+                f" {mae:>5.2f}%  {rmse:>5.2f}%"
+            )
         print()
     print("=" * 74)
-    print("\n  Best params saved — model.train() will use them automatically.\n")
+    print(
+        "\n  Best params saved — model.train() will use them automatically.\n"
+    )
 
 
 if __name__ == "__main__":
     from train import _apply_rolling_window
 
     from data.feature_engineering import build_features
+
     features = build_features()
     features = _apply_rolling_window(features)
     run_tuning(features)

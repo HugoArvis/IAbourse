@@ -28,7 +28,8 @@ SOURCES = ("yfinance", "tiingo")
 START = "1995-01-01"
 BATCH = 40
 PAUSE = 3.0  # seconds between batches
-MIN_ROWS = 5  # a yfinance answer this short is a failed download, not a price history
+# a yfinance answer this short is a failed download, not a price history
+MIN_ROWS = 5
 
 
 def yf_symbol(ticker: str) -> str:
@@ -36,30 +37,53 @@ def yf_symbol(ticker: str) -> str:
 
 
 def _path(ticker: str, source: str = "yfinance") -> Path:
-    return (YF_DIR if source == "yfinance" else TIINGO_DIR) / f"{ticker}.parquet"
+    return (
+        YF_DIR if source == "yfinance" else TIINGO_DIR
+    ) / f"{ticker}.parquet"
 
 
 def download(tickers: list[str]) -> None:
     YF_DIR.mkdir(parents=True, exist_ok=True)
     todo = [t for t in tickers if not _path(t).exists()]
-    print(f"{len(tickers) - len(todo)} cached, {len(todo)} to download", flush=True)
+    print(
+        f"{len(tickers) - len(todo)} cached, {len(todo)} to download",
+        flush=True,
+    )
     for i in range(0, len(todo), BATCH):
-        batch = todo[i:i + BATCH]
-        data = yf.download([yf_symbol(t) for t in batch], start=START, auto_adjust=False,
-                           actions=True, group_by="ticker", progress=False, threads=True)
+        batch = todo[i : i + BATCH]
+        data = yf.download(
+            [yf_symbol(t) for t in batch],
+            start=START,
+            auto_adjust=False,
+            actions=True,
+            group_by="ticker",
+            progress=False,
+            threads=True,
+        )
         for t in batch:
             sym = yf_symbol(t)
             if data.empty or sym not in data.columns.get_level_values(0):
                 df = pd.DataFrame()
             else:
                 df = data[sym].dropna(how="all", subset=["Close"])
-                df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close",
-                                        "Adj Close": "adj_close", "Volume": "volume",
-                                        "Dividends": "dividends", "Stock Splits": "splits"})
+                df = df.rename(
+                    columns={
+                        "Open": "open",
+                        "High": "high",
+                        "Low": "low",
+                        "Close": "close",
+                        "Adj Close": "adj_close",
+                        "Volume": "volume",
+                        "Dividends": "dividends",
+                        "Stock Splits": "splits",
+                    }
+                )
                 df.index.name = "date"
                 if len(df) <= MIN_ROWS:
-                    continue  # truncated answer (seen under rate limiting): retry next run
-            df.to_parquet(_path(t))  # empty frame = "no data" marker, avoids re-asking
+                    # truncated answer (seen under rate limiting): retry next run
+                    continue
+            # empty frame = "no data" marker, avoids re-asking
+            df.to_parquet(_path(t))
         done = min(i + BATCH, len(todo))
         print(f"  {done}/{len(todo)}", flush=True)
         time.sleep(PAUSE)
@@ -80,12 +104,22 @@ def download_tiingo(ticker: str) -> bool:
         df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
         df = df.set_index("date").sort_index()
         split = df["splitFactor"].where(df["splitFactor"] > 0, 1.0)
-        after = split[::-1].cumprod()[::-1].shift(-1, fill_value=1.0)  # splits strictly after t
-        df = pd.DataFrame({
-            "open": df["open"] / after, "high": df["high"] / after, "low": df["low"] / after,
-            "close": df["close"] / after, "adj_close": df["adjClose"], "volume": df["volume"] * after,
-            "dividends": df["divCash"] / after, "splits": df["splitFactor"].where(df["splitFactor"] != 1.0, 0.0),
-        })
+        # splits strictly after t
+        after = split[::-1].cumprod()[::-1].shift(-1, fill_value=1.0)
+        df = pd.DataFrame(
+            {
+                "open": df["open"] / after,
+                "high": df["high"] / after,
+                "low": df["low"] / after,
+                "close": df["close"] / after,
+                "adj_close": df["adjClose"],
+                "volume": df["volume"] * after,
+                "dividends": df["divCash"] / after,
+                "splits": (
+                    df["splitFactor"].where(df["splitFactor"] != 1.0, 0.0)
+                ),
+            }
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(path)
     return not df.empty
@@ -97,7 +131,9 @@ def load(ticker: str, source: str = "yfinance") -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     df = pd.read_parquet(path)
-    return df[df.index < pd.Timestamp.today().normalize()] if not df.empty else df
+    return (
+        df[df.index < pd.Timestamp.today().normalize()] if not df.empty else df
+    )
 
 
 if __name__ == "__main__":

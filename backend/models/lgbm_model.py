@@ -7,7 +7,10 @@ import pandas as pd
 from loguru import logger
 
 from config import (
-    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE,
+    CRISIS_PERIODS,
+    CRISIS_SAMPLE_WEIGHT,
+    MODEL_DIR,
+    TEMPORAL_WEIGHT_HALF_LIFE,
 )
 from data.feature_engineering import CATEGORICAL_FEATURES, FEATURE_COLUMNS
 
@@ -53,6 +56,7 @@ class LGBMModel:
     @classmethod
     def _make_regressor(cls, custom_params: dict | None = None):
         import lightgbm as lgb
+
         base = dict(
             n_estimators=800,
             learning_rate=0.03,
@@ -63,8 +67,8 @@ class LGBMModel:
             colsample_bytree=0.8,
             reg_alpha=0.1,
             reg_lambda=1.0,
-            objective="huber",      # robust to outlier returns
-            alpha=1.0,              # Huber loss threshold
+            objective="huber",  # robust to outlier returns
+            alpha=1.0,  # Huber loss threshold
             random_state=42,
             n_jobs=-1,
             verbose=-1,
@@ -79,7 +83,9 @@ class LGBMModel:
         try:
             import lightgbm as lgb
         except ImportError:
-            raise RuntimeError("lightgbm not installed — run: pip install lightgbm")
+            raise RuntimeError(
+                "lightgbm not installed — run: pip install lightgbm"
+            )
 
         target_col = _HORIZON_MAP[horizon][0]
         df = features.copy().dropna(subset=[target_col])
@@ -109,7 +115,8 @@ class LGBMModel:
             logger.info(f"LightGBM [{horizon}] using tuned hyperparameters")
         model = cls._make_regressor(custom_params=best_params)
         model.fit(
-            feat_df, y,
+            feat_df,
+            y,
             sample_weight=sample_weight,
             categorical_feature=CATEGORICAL_FEATURES,
         )
@@ -142,11 +149,17 @@ class LGBMModel:
 
     def predict_latest(self, features: pd.DataFrame) -> float:
         """Return predicted forward relative return for the most recent row.
-        Positive = expected outperformance vs SP500, negative = underperformance."""
+        Positive = expected outperformance vs SP500, negative = underperformance.
+        """
         if self._model is None:
             return 0.0
         try:
-            row = features[FEATURE_COLUMNS].iloc[[-1]].fillna(0).astype(np.float32)
+            row = (
+                features[FEATURE_COLUMNS]
+                .iloc[[-1]]
+                .fillna(0)
+                .astype(np.float32)
+            )
             return float(self._model.predict(row)[0])
         except Exception as e:
             logger.error(f"LightGBM [{self._horizon}] prediction failed: {e}")
@@ -159,6 +172,7 @@ class LGBMModel:
         try:
             from scipy import stats
             from sklearn.metrics import mean_absolute_error
+
             df = features.dropna(subset=[self._target_col])
             X = df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
             y_true = df[self._target_col].astype(np.float32).values

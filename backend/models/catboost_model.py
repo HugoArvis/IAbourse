@@ -6,7 +6,10 @@ import pandas as pd
 from loguru import logger
 
 from config import (
-    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE,
+    CRISIS_PERIODS,
+    CRISIS_SAMPLE_WEIGHT,
+    MODEL_DIR,
+    TEMPORAL_WEIGHT_HALF_LIFE,
 )
 from data.feature_engineering import CATEGORICAL_FEATURES, FEATURE_COLUMNS
 
@@ -15,7 +18,11 @@ _HORIZON_MAP = {
     "21d": ("relative_return_21d", "catboost_21d.cbm"),
 }
 
-_CAT_INDICES = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_FEATURES if c in FEATURE_COLUMNS]
+_CAT_INDICES = [
+    FEATURE_COLUMNS.index(c)
+    for c in CATEGORICAL_FEATURES
+    if c in FEATURE_COLUMNS
+]
 
 
 class CatBoostModel:
@@ -52,7 +59,9 @@ class CatBoostModel:
         try:
             from catboost import CatBoostRegressor
         except ImportError:
-            raise RuntimeError("catboost not installed — run: pip install catboost")
+            raise RuntimeError(
+                "catboost not installed — run: pip install catboost"
+            )
         base = dict(
             iterations=800,
             learning_rate=0.03,
@@ -67,11 +76,15 @@ class CatBoostModel:
         return CatBoostRegressor(**base)
 
     @classmethod
-    def train(cls, features: pd.DataFrame, horizon: str = "5d") -> "CatBoostModel":
+    def train(
+        cls, features: pd.DataFrame, horizon: str = "5d"
+    ) -> "CatBoostModel":
         try:
             from catboost import Pool
         except ImportError:
-            raise RuntimeError("catboost not installed — run: pip install catboost")
+            raise RuntimeError(
+                "catboost not installed — run: pip install catboost"
+            )
 
         target_col = _HORIZON_MAP[horizon][0]
         df = features.copy().dropna(subset=[target_col])
@@ -155,6 +168,7 @@ class CatBoostModel:
         try:
             from scipy import stats
             from sklearn.metrics import mean_absolute_error
+
             df = features.dropna(subset=[self._target_col])
             X = df[FEATURE_COLUMNS].fillna(0)
             y_true = df[self._target_col].astype(np.float32).values

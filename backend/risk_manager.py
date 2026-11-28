@@ -1,39 +1,53 @@
 from loguru import logger
 
 from config import (
-    CONFIDENCE_THRESHOLD, EARNINGS_BLACKOUT_HOURS, MAX_PORTFOLIO_DRAWDOWN,
-    MAX_POSITION_PCT, MIN_AVG_VOLUME,
+    CONFIDENCE_THRESHOLD,
+    EARNINGS_BLACKOUT_HOURS,
+    MAX_PORTFOLIO_DRAWDOWN,
+    MAX_POSITION_PCT,
+    MIN_AVG_VOLUME,
 )
 
 
 class RiskManager:
     """Hard-coded risk rules. Never bypass."""
 
-    def check_confidence(self, confidence: float, score: float, position_pct: float) -> tuple[float, float]:
+    def check_confidence(
+        self, confidence: float, score: float, position_pct: float
+    ) -> tuple[float, float]:
         """Return (score, position_pct). Forces neutral if confidence too low."""
         if confidence < CONFIDENCE_THRESHOLD:
-            logger.warning(f"Confidence {confidence:.3f} < {CONFIDENCE_THRESHOLD} — forcing neutral")
+            logger.warning(
+                f"Confidence {confidence:.3f} < {CONFIDENCE_THRESHOLD} —"
+                " forcing neutral"
+            )
             return 5.0, 0.0
         return score, position_pct
 
-    def clamp_position(self, position_pct: float, portfolio_value: float, ticker: str) -> float:
+    def clamp_position(
+        self, position_pct: float, portfolio_value: float, ticker: str
+    ) -> float:
         """Enforce max position per ticker rule."""
         max_pct = MAX_POSITION_PCT * 100.0
         if abs(position_pct) > max_pct:
             logger.warning(
-                f"Position {position_pct:.1f}% for {ticker} exceeds max {max_pct:.0f}% — clamping"
+                f"Position {position_pct:.1f}% for {ticker} exceeds max"
+                f" {max_pct:.0f}% — clamping"
             )
             return max_pct * (1 if position_pct > 0 else -1)
         return position_pct
 
-    def check_global_stop_loss(self, current_value: float, start_value: float) -> bool:
+    def check_global_stop_loss(
+        self, current_value: float, start_value: float
+    ) -> bool:
         """Return True if global stop-loss triggered (drawdown > 20%)."""
         if start_value <= 0:
             return False
         drawdown = (start_value - current_value) / start_value
         if drawdown >= MAX_PORTFOLIO_DRAWDOWN:
             logger.critical(
-                f"GLOBAL STOP-LOSS: drawdown {drawdown:.1%} >= {MAX_PORTFOLIO_DRAWDOWN:.0%}"
+                f"GLOBAL STOP-LOSS: drawdown {drawdown:.1%} >="
+                f" {MAX_PORTFOLIO_DRAWDOWN:.0%}"
             )
             return True
         return False
@@ -41,15 +55,24 @@ class RiskManager:
     def check_volume(self, avg_volume: float, ticker: str) -> bool:
         """Return True if ticker is liquid enough to trade."""
         if avg_volume < MIN_AVG_VOLUME:
-            logger.warning(f"{ticker} avg volume {avg_volume:,.0f} < {MIN_AVG_VOLUME:,} — skipping")
+            logger.warning(
+                f"{ticker} avg volume {avg_volume:,.0f} < {MIN_AVG_VOLUME:,} —"
+                " skipping"
+            )
             return False
         return True
 
-    def check_earnings_blackout(self, hours_to_earnings: float | None, ticker: str) -> bool:
+    def check_earnings_blackout(
+        self, hours_to_earnings: float | None, ticker: str
+    ) -> bool:
         """Return True if in earnings blackout window (should freeze position)."""
-        if hours_to_earnings is not None and 0 < hours_to_earnings <= EARNINGS_BLACKOUT_HOURS:
+        if (
+            hours_to_earnings is not None
+            and 0 < hours_to_earnings <= EARNINGS_BLACKOUT_HOURS
+        ):
             logger.warning(
-                f"{ticker} earnings in {hours_to_earnings:.0f}h — blackout active, no trade"
+                f"{ticker} earnings in {hours_to_earnings:.0f}h — blackout"
+                " active, no trade"
             )
             return True
         return False
@@ -78,9 +101,13 @@ class RiskManager:
         if self.check_earnings_blackout(hours_to_earnings, ticker):
             return 5.0, 0.0, False
 
-        score, position_pct = self.check_confidence(confidence, score, position_pct)
+        score, position_pct = self.check_confidence(
+            confidence, score, position_pct
+        )
         if position_pct == 0.0:
             return score, 0.0, False
 
-        position_pct = self.clamp_position(position_pct, portfolio_value, ticker)
+        position_pct = self.clamp_position(
+            position_pct, portfolio_value, ticker
+        )
         return score, position_pct, True
