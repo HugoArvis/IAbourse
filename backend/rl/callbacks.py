@@ -1,5 +1,8 @@
 import os
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
+
+from stable_baselines3.common.callbacks import (
+    EvalCallback, StopTrainingOnRewardThreshold,
+)
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 

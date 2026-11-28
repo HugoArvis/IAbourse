@@ -1,17 +1,21 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import mlflow
+import sys
+
 import lightning as pl
+import mlflow
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from loguru import logger
-from config import (
-    TFT_BATCH_SIZE, TFT_MAX_EPOCHS, MODEL_DIR, MLFLOW_TRACKING_URI,
-    TFT_EARLY_STOPPING_PATIENCE, TFT_FEATURE_NOISE_STD,
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (  # noqa: E402
+    MLFLOW_TRACKING_URI, MODEL_DIR, TFT_BATCH_SIZE,
+    TFT_EARLY_STOPPING_PATIENCE, TFT_FEATURE_NOISE_STD, TFT_MAX_EPOCHS,
 )
-from training.dataset import build_timeseries_dataset, build_weighted_train_dataloader
-from training.callbacks import FeatureNoiseCallback
-from models.nhits_model import NHiTSModel
+from models.nhits_model import NHiTSModel  # noqa: E402
+from training.callbacks import FeatureNoiseCallback  # noqa: E402
+from training.dataset import (  # noqa: E402
+    build_timeseries_dataset, build_weighted_train_dataloader,
+)
 
 
 def _walk_forward_splits(df, n_folds: int = 5):

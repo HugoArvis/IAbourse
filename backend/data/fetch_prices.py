@@ -1,11 +1,15 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
+from datetime import datetime, timedelta
+
 import pandas as pd
 import yfinance as yf
 from loguru import logger
-from datetime import datetime, timedelta
-from config import TICKERS, MACRO_TICKERS, PRICE_HISTORY_YEARS, DATA_DIR
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (  # noqa: E402
+    DATA_DIR, MACRO_TICKERS, PRICE_HISTORY_YEARS, TICKERS,
+)
 
 
 def _parquet_path(ticker: str) -> str:

@@ -6,16 +6,22 @@ Best params saved as JSON in MODEL_DIR and auto-loaded by LGBMModel / CatBoostMo
 Usage:
     py training/tune_hyperparams.py
 """
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import json
+import os
+import sys
+
 import numpy as np
 import pandas as pd
 from loguru import logger
-from config import MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE, CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import (  # noqa: E402
+    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE,
+)
+from data.feature_engineering import (  # noqa: E402
+    CATEGORICAL_FEATURES, FEATURE_COLUMNS,
+)
 
 _REGRESSION_TARGETS = {"5d": "relative_return", "21d": "relative_return_21d"}
 
@@ -73,8 +79,8 @@ def tune_lgbm(train_df: pd.DataFrame, val_df: pd.DataFrame,
     Optuna study for LightGBM. Uses early stopping to find optimal n_estimators.
     Objective: macro-F1 on the validation set (unweighted — real-world performance).
     """
-    import optuna
     import lightgbm as lgb
+    import optuna
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     target_col = _REGRESSION_TARGETS[horizon]
@@ -205,9 +211,10 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
       4. Retrain final models on train+val with best params
       5. Report test-set accuracy for both models, both horizons
     """
-    from models.lgbm_model import LGBMModel
-    from models.catboost_model import CatBoostModel
     from sklearn.metrics import accuracy_score, f1_score
+
+    from models.catboost_model import CatBoostModel
+    from models.lgbm_model import LGBMModel
 
     train_df, val_df, test_df, train_cut, val_cut = three_way_split(features)
     train_val_df = pd.concat([train_df, val_df])
@@ -263,8 +270,9 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
 
 
 if __name__ == "__main__":
-    from data.feature_engineering import build_features
     from train import _apply_rolling_window
+
+    from data.feature_engineering import build_features
     features = build_features()
     features = _apply_rolling_window(features)
     run_tuning(features)

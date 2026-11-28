@@ -1,10 +1,15 @@
-import os
 import glob
+import os
 import shutil
-import torch
+
 import pandas as pd
+import torch
 from loguru import logger
-from config import MODEL_DIR, TFT_HIDDEN_SIZE, TFT_MAX_EPOCHS, TFT_BATCH_SIZE, TFT_WEIGHT_DECAY, CLASS_WEIGHTS
+
+from config import (
+    CLASS_WEIGHTS, MODEL_DIR, TFT_BATCH_SIZE, TFT_HIDDEN_SIZE, TFT_MAX_EPOCHS,
+    TFT_WEIGHT_DECAY,
+)
 from models.tft_model import WeightedCrossEntropy
 
 

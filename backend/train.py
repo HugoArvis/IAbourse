@@ -1,8 +1,9 @@
 """
 Training launcher — run this instead of calling training scripts directly.
 """
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 PROFILES = {
@@ -144,6 +145,7 @@ def _apply_rolling_window(features):
     """Filter features to the last ROLLING_WINDOW_YEARS of data before training.
     Addresses regime non-stationarity — old dynamics hurt recent-period accuracy."""
     import pandas as pd
+
     from config import ROLLING_WINDOW_YEARS
     if ROLLING_WINDOW_YEARS is None:
         return features
@@ -191,6 +193,7 @@ def run_tft(features, profile):
 def _three_way_split(features):
     """60/20/20 temporal split — val for model selection, test for final honest eval."""
     import pandas as pd
+
     from training.tune_hyperparams import three_way_split
     return three_way_split(features)
 
@@ -235,8 +238,9 @@ def _print_comparison_table(results: dict):
 
 def run_comparison(features, profile):
     import pandas as pd
-    from models.lgbm_model import LGBMModel
+
     from models.catboost_model import CatBoostModel
+    from models.lgbm_model import LGBMModel
 
     train_df, val_df, test_df, train_cut, val_cut = _three_way_split(features)
     train_val_df = pd.concat([train_df, val_df])
@@ -290,8 +294,8 @@ def main():
 
     # RL mode: features already built inside train_rl (no rolling window — needs full history)
     if mode == "rl":
-        from rl.train_rl import train_rl
         from data.feature_engineering import build_features
+        from rl.train_rl import train_rl
         print("Building features...")
         features = build_features()
         train_rl(features, total_timesteps=profile["total_timesteps"])

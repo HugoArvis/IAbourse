@@ -30,7 +30,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from membership.build_membership import assign_company_ids, load_holdings  # noqa: E402
+from membership.build_membership import (  # noqa: E402
+    assign_company_ids, load_holdings,
+)
 from prices.download import SOURCES, load  # noqa: E402
 from prices.validate import TOLERANCE, price_on, unadjusted_close  # noqa: E402
 from sources import sec  # noqa: E402

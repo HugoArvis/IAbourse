@@ -1,9 +1,9 @@
+import gymnasium as gym
 import torch
 import torch.nn as nn
+from loguru import logger
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-import gymnasium as gym
-from loguru import logger
 
 
 class TFTFeaturesExtractor(BaseFeaturesExtractor):

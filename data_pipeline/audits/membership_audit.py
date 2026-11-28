@@ -14,7 +14,9 @@ import index_constitution as ic
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from membership.wiki_sources import ic_members_at, load_hanshof  # noqa: E402,F401
+from membership.wiki_sources import (  # noqa: E402,F401
+    ic_members_at, load_hanshof,
+)
 
 
 def main() -> None:

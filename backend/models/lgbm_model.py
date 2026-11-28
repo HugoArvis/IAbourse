@@ -1,11 +1,15 @@
-import os
 import json
+import os
 import pickle
+
 import numpy as np
 import pandas as pd
 from loguru import logger
-from config import MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE, CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
+
+from config import (
+    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE,
+)
+from data.feature_engineering import CATEGORICAL_FEATURES, FEATURE_COLUMNS
 
 # Maps horizon → (regression target column, checkpoint filename)
 _HORIZON_MAP = {
@@ -153,8 +157,8 @@ class LGBMModel:
         if self._model is None:
             return {}
         try:
-            from sklearn.metrics import mean_absolute_error
             from scipy import stats
+            from sklearn.metrics import mean_absolute_error
             df = features.dropna(subset=[self._target_col])
             X = df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
             y_true = df[self._target_col].astype(np.float32).values

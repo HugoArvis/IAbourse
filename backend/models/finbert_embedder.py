@@ -8,7 +8,9 @@ class FinBERTEmbedder:
     """Local FinBERT inference — no API call, fully offline."""
 
     def __init__(self, device: str | None = None):
-        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        from transformers import (
+            AutoModelForSequenceClassification, AutoTokenizer,
+        )
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Loading FinBERT on {self.device}...")

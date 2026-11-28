@@ -1,15 +1,17 @@
 import os
 from datetime import datetime, timezone
+
 from loguru import logger
+
 from config import (
-    ALPACA_API_KEY, ALPACA_SECRET_KEY,
-    EQUITY_TICKERS, MAX_OPEN_POSITIONS, MAX_PER_SECTOR, STOP_LOSS_PCT, SECTOR_MAP,
+    ALPACA_API_KEY, ALPACA_SECRET_KEY, EQUITY_TICKERS, MAX_OPEN_POSITIONS,
+    MAX_PER_SECTOR, SECTOR_MAP, STOP_LOSS_PCT,
 )
 
 try:
     from alpaca.trading.client import TradingClient
-    from alpaca.trading.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
+    from alpaca.trading.requests import MarketOrderRequest
     _ALPACA_AVAILABLE = True
 except ImportError:
     _ALPACA_AVAILABLE = False
@@ -65,8 +67,8 @@ class AlpacaConnector:
     def get_trade_history(self) -> list[dict]:
         if self._client:
             try:
-                from alpaca.trading.requests import GetOrdersRequest
                 from alpaca.trading.enums import QueryOrderStatus
+                from alpaca.trading.requests import GetOrdersRequest
                 orders = self._client.get_orders(
                     GetOrdersRequest(status=QueryOrderStatus.ALL)
                 )
@@ -165,8 +167,8 @@ class AlpacaConnector:
             return
         try:
             # Cancel any open orders for this ticker to avoid wash-trade rejection
-            from alpaca.trading.requests import GetOrdersRequest
             from alpaca.trading.enums import QueryOrderStatus
+            from alpaca.trading.requests import GetOrdersRequest
             open_orders = self._client.get_orders(
                 GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[ticker])
             )

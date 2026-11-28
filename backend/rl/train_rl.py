@@ -16,25 +16,27 @@ Usage:
     py train.py   →  select profile 9 (full) or 10 (quick test)
 """
 
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from config import (
-    PPO_LR, PPO_N_STEPS, PPO_BATCH_SIZE, PPO_N_EPOCHS,
-    PPO_GAMMA, PPO_GAE_LAMBDA, PPO_CLIP_RANGE, PPO_ENT_COEF,
-    PPO_TOTAL_TIMESTEPS, MODEL_DIR,
-)
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
-from rl.trading_env import TradingEnv, EPISODE_LENGTH
-from rl.callbacks import build_callbacks
-from rl.reward_functions import _episode_sharpe
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import (  # noqa: E402
+    MODEL_DIR, PPO_BATCH_SIZE, PPO_CLIP_RANGE, PPO_ENT_COEF, PPO_GAE_LAMBDA,
+    PPO_GAMMA, PPO_LR, PPO_N_EPOCHS, PPO_N_STEPS, PPO_TOTAL_TIMESTEPS,
+)
+from data.feature_engineering import (  # noqa: E402
+    CATEGORICAL_FEATURES, FEATURE_COLUMNS,
+)
+from rl.callbacks import build_callbacks  # noqa: E402
+from rl.reward_functions import _episode_sharpe  # noqa: E402
+from rl.trading_env import EPISODE_LENGTH, TradingEnv  # noqa: E402
 
 # ── Data preparation ──────────────────────────────────────────────────────────
 
@@ -45,9 +47,9 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
        This avoids calling models inside the hot training loop.
     3. Return (train_dict, val_dict): ticker → DataFrame.
     """
-    from training.tune_hyperparams import three_way_split
-    from models.lgbm_model import LGBMModel
     from models.catboost_model import CatBoostModel
+    from models.lgbm_model import LGBMModel
+    from training.tune_hyperparams import three_way_split
 
     train_df, val_df, _, train_cut, val_cut = three_way_split(features)
 

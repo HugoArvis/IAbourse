@@ -10,7 +10,6 @@ from pathlib import Path
 
 import index_constitution as ic
 import pandas as pd
-
 from membership_audit import load_hanshof
 
 RAW = Path(__file__).resolve().parents[1] / "cache" / "raw"

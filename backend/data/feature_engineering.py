@@ -1,10 +1,15 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import pandas as pd
+import sys
+
 import numpy as np
+import pandas as pd
 from loguru import logger
-from config import TICKERS, EQUITY_TICKERS, DATA_DIR, ENCODER_LENGTH, PREDICTION_HORIZON, SELL_THRESHOLD, BUY_THRESHOLD, MACRO_TICKERS
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (  # noqa: E402
+    BUY_THRESHOLD, DATA_DIR, ENCODER_LENGTH, EQUITY_TICKERS, MACRO_TICKERS,
+    PREDICTION_HORIZON, SELL_THRESHOLD, TICKERS,
+)
 
 try:
     import ta

@@ -1,13 +1,18 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import pandas as pd
+import sys
+
 import numpy as np
+import pandas as pd
 import torch
-from torch.utils.data import WeightedRandomSampler
 from loguru import logger
-from config import ENCODER_LENGTH, PREDICTION_HORIZON, TFT_BATCH_SIZE, TEMPORAL_WEIGHT_HALF_LIFE
-from data.feature_engineering import FEATURE_COLUMNS
+from torch.utils.data import WeightedRandomSampler
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (  # noqa: E402
+    ENCODER_LENGTH, PREDICTION_HORIZON, TEMPORAL_WEIGHT_HALF_LIFE,
+    TFT_BATCH_SIZE,
+)
+from data.feature_engineering import FEATURE_COLUMNS  # noqa: E402
 
 
 def build_timeseries_dataset(features: pd.DataFrame, cutoff_date: str | None = None):

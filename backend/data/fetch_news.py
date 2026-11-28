@@ -1,12 +1,14 @@
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
+import os
+import sys
+from datetime import datetime, timedelta, timezone
+
 import finnhub
 import pandas as pd
-from datetime import datetime, timedelta, timezone
 from loguru import logger
-from config import FINNHUB_API_KEY, TICKERS, DATA_DIR
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DATA_DIR, FINNHUB_API_KEY, TICKERS  # noqa: E402
 
 try:
     from models.finbert_embedder import FinBERTEmbedder

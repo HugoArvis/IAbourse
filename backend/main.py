@@ -1,17 +1,20 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from loguru import logger
 import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from config import PRIMARY_TICKER, WS_MARKET_HOURS_INTERVAL, WS_OFF_HOURS_INTERVAL
-from ws_manager import WSManager
-from scheduler import TradingScheduler
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from loguru import logger
+
 from alpaca_connector import AlpacaConnector
+from config import (
+    PRIMARY_TICKER, WS_MARKET_HOURS_INTERVAL, WS_OFF_HOURS_INTERVAL,
+)
+from scheduler import TradingScheduler
+from ws_manager import WSManager
 
 ws_manager = WSManager()
 scheduler = TradingScheduler()
@@ -216,8 +219,8 @@ async def model_run_now():
 
     async def _run():
         try:
-            from data.fetch_prices import fetch_latest_prices
             from data.feature_engineering import build_features
+            from data.fetch_prices import fetch_latest_prices
             logger.info("Manual run-now triggered")
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, fetch_latest_prices)

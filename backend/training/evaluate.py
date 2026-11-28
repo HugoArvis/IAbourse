@@ -1,14 +1,22 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
 import traceback
+
 import numpy as np
 import pandas as pd
 from loguru import logger
-from sklearn.metrics import accuracy_score, classification_report, cohen_kappa_score
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES, build_features
-from models.lgbm_model import _HORIZON_MAP
-from config import CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, RECOVERY_PERIODS
+from sklearn.metrics import (
+    accuracy_score, classification_report, cohen_kappa_score,
+)
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (  # noqa: E402
+    CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT, RECOVERY_PERIODS,
+)
+from data.feature_engineering import (  # noqa: E402
+    CATEGORICAL_FEATURES, FEATURE_COLUMNS, build_features,
+)
+from models.lgbm_model import _HORIZON_MAP  # noqa: E402
 
 _TARGET = {"1d": "label_1d", "5d": "label", "21d": "label_21d"}
 

@@ -1,9 +1,10 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
+
 from config import (
-    SCHEDULE_HOUR, SCHEDULE_MINUTE, SCHEDULE_TIMEZONE,
-    RETRAIN_DAY_OF_WEEK, RETRAIN_HOUR, RETRAIN_MINUTE,
+    RETRAIN_DAY_OF_WEEK, RETRAIN_HOUR, RETRAIN_MINUTE, SCHEDULE_HOUR,
+    SCHEDULE_MINUTE, SCHEDULE_TIMEZONE,
 )
 
 
@@ -12,9 +13,9 @@ def _daily_job():
     logger.info("Daily trading job started")
     try:
         # Import here to avoid circular imports at startup
+        from data.feature_engineering import build_features
         from data.fetch_news import fetch_and_embed_news
         from data.fetch_prices import fetch_latest_prices
-        from data.feature_engineering import build_features
 
         logger.info("Fetching latest prices and news...")
         fetch_latest_prices()
@@ -24,9 +25,11 @@ def _daily_job():
 
         # Inference + order placement handled by alpaca_connector
         # (model must already be trained and loaded)
-        from alpaca_connector import AlpacaConnector
-        import main as _main  # update shared state so WebSocket picks it up
         from datetime import datetime, timezone
+
+        import main as _main  # update shared state so WebSocket picks it up
+
+        from alpaca_connector import AlpacaConnector
         connector = AlpacaConnector()
         result = connector.run_inference_and_trade(features)
         if result:
@@ -41,11 +44,11 @@ def _weekly_retrain_job():
     """Sunday evening retraining — keeps models calibrated to the current regime."""
     logger.info("Weekly retraining job started")
     try:
-        from data.fetch_prices import fetch_all_prices
-        from data.fetch_news import fetch_and_embed_news
         from data.feature_engineering import build_features
-        from models.lgbm_model import LGBMModel
+        from data.fetch_news import fetch_and_embed_news
+        from data.fetch_prices import fetch_all_prices
         from models.catboost_model import CatBoostModel
+        from models.lgbm_model import LGBMModel
 
         logger.info("Fetching latest data for retraining...")
         fetch_all_prices(force=False)

@@ -1,7 +1,10 @@
 import numpy as np
 import pandas as pd
 from loguru import logger
-from config import CONFIDENCE_THRESHOLD, SCORE_NEUTRAL, MAX_PREDICTED_RETURN, HORIZON_WEIGHTS
+
+from config import (
+    CONFIDENCE_THRESHOLD, HORIZON_WEIGHTS, MAX_PREDICTED_RETURN, SCORE_NEUTRAL,
+)
 
 
 def _strategy_text(ret: float, confidence: float, stress: float) -> str:
@@ -43,8 +46,9 @@ class MultiHorizonScorer:
         self._model_21d = None
 
     def load(self) -> "MultiHorizonScorer":
-        from models.lgbm_model import LGBMModel
         from models.catboost_model import CatBoostModel
+        from models.lgbm_model import LGBMModel
+
         # 5d: CatBoost (IC 0.046, better rank signal — but direction acc ~50%, 5% weight only)
         # 21d: LightGBM (IC 0.123, direction acc 55.4% — primary decision driver)
         self._model_5d = CatBoostModel.load_latest(horizon="5d")

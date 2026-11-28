@@ -17,7 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from membership.tickers import ic_with_cik, key, ticker_to_cik  # noqa: E402
-from membership.wiki_sources import hanshof_ticker_periods, ic_members_at, load_hanshof  # noqa: E402
+from membership.wiki_sources import (  # noqa: E402
+    hanshof_ticker_periods, ic_members_at, load_hanshof,
+)
 
 CACHE = ROOT / "cache"
 

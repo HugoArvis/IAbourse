@@ -21,11 +21,17 @@ from rapidfuzz import fuzz
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from membership.build_membership import assign_company_ids, load_holdings  # noqa: E402
+from membership.build_membership import (  # noqa: E402
+    assign_company_ids, load_holdings,
+)
 from membership.entity_match import normalize  # noqa: E402
-from membership.tickers import historical_ticker_names, ic_with_cik, key, ticker_to_cik  # noqa: E402
+from membership.tickers import (  # noqa: E402
+    historical_ticker_names, ic_with_cik, key, ticker_to_cik,
+)
+from membership.wiki_sources import (  # noqa: E402
+    hanshof_ticker_periods, load_hanshof,
+)
 from sources import sec  # noqa: E402
-from membership.wiki_sources import hanshof_ticker_periods, load_hanshof  # noqa: E402
 
 CACHE = ROOT / "cache"
 NAME_MATCH = 90  # rapidfuzz token_sort_ratio on normalized names

@@ -1,7 +1,8 @@
+import gymnasium as gym
 import numpy as np
 import pandas as pd
-import gymnasium as gym
 from gymnasium import spaces
+
 from config import MAX_PREDICTED_RETURN
 
 EPISODE_LENGTH = 252  # 1 trading year

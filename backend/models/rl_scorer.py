@@ -1,8 +1,10 @@
 import os
+
 import numpy as np
 import pandas as pd
 from loguru import logger
-from config import MODEL_DIR, MAX_PREDICTED_RETURN
+
+from config import MAX_PREDICTED_RETURN, MODEL_DIR
 
 
 class RLScorer:
