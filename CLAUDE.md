@@ -18,6 +18,15 @@
 - Do not hallucinate APIs, libraries, or features
 - Do not generate untested or speculative code
 
+### Code style
+
+- Python code follows PEP 8 (https://peps.python.org/pep-0008/): lines
+  <= 79 characters, docstrings and comments <= 72, no assigned lambdas.
+- Check before every commit:
+  `python -m pycodestyle --max-doc-length=72 <files>`
+- Files written before 2026-11-28 are not compliant yet: fix them only
+  when asked, or when they are modified anyway.
+
 ### How decisions are made on this project
 
 - The project owner decides the strategy. Explain the options and give a
