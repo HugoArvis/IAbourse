@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 import numpy as np
@@ -78,13 +79,13 @@ def _compute_regime_features(df: pd.DataFrame) -> pd.DataFrame:
     if "vix" in df.columns and df["vix"].notna().any():
         vix = df["vix"]
         vix_mean = vix.rolling(252, min_periods=63).mean()
-        vix_std  = vix.rolling(252, min_periods=63).std().replace(0, np.nan)
-        df["vix_z"]      = ((vix - vix_mean) / vix_std).fillna(0.0)
+        vix_std = vix.rolling(252, min_periods=63).std().replace(0, np.nan)
+        df["vix_z"] = ((vix - vix_mean) / vix_std).fillna(0.0)
         df["vix_regime"] = pd.cut(
             vix, bins=[0, 15, 25, 35, 9999], labels=[0, 1, 2, 3]
         ).astype(float).fillna(1.0)
     else:
-        df["vix_z"]      = 0.0
+        df["vix_z"] = 0.0
         df["vix_regime"] = 1.0
 
     # SP500 position relative to 200-day MA and depth of drawdown from 252-day high
@@ -100,8 +101,8 @@ def _compute_regime_features(df: pd.DataFrame) -> pd.DataFrame:
         df["sp500_momentum"] = sp.pct_change(63).fillna(0.0)
     else:
         df["sp500_200d_ratio"] = 0.0
-        df["market_drawdown"]  = 0.0
-        df["sp500_momentum"]   = 0.0
+        df["market_drawdown"] = 0.0
+        df["sp500_momentum"] = 0.0
 
     # Stock's own drawdown from its 252-day high (how deep in the hole is this ticker)
     stock_high = df["close"].rolling(252, min_periods=63).max()
@@ -154,22 +155,22 @@ def _atr_thresholds(relative_return: pd.Series, atr: pd.Series) -> tuple[pd.Seri
     so thresholds widen in high-volatility periods and compress in low-volatility ones.
     """
     window = 252
-    min_p  = 63
+    min_p = 63
 
     # Rolling 25th and 75th percentiles of relative_return (target the 25/50/25 split)
-    buy_pct  = relative_return.rolling(window, min_periods=min_p).quantile(0.75)
+    buy_pct = relative_return.rolling(window, min_periods=min_p).quantile(0.75)
     sell_pct = relative_return.rolling(window, min_periods=min_p).quantile(0.25)
 
     # ATR regime ratio — scale thresholds with current vs average volatility
     atr_aligned = atr.reindex(relative_return.index).ffill()
-    atr_mean    = atr_aligned.rolling(window, min_periods=min_p).mean()
-    atr_ratio   = (atr_aligned / atr_mean.replace(0, np.nan)).clip(0.5, 2.0).fillna(1.0)
+    atr_mean = atr_aligned.rolling(window, min_periods=min_p).mean()
+    atr_ratio = (atr_aligned / atr_mean.replace(0, np.nan)).clip(0.5, 2.0).fillna(1.0)
 
-    buy_thresh  = (buy_pct  * atr_ratio).fillna(abs(BUY_THRESHOLD))
+    buy_thresh = (buy_pct * atr_ratio).fillna(abs(BUY_THRESHOLD))
     sell_thresh = (sell_pct * atr_ratio).fillna(SELL_THRESHOLD)  # sell_pct is negative
 
     # Guard: buy_thresh must be positive, sell_thresh must be negative
-    buy_thresh  = buy_thresh.clip(lower=abs(BUY_THRESHOLD))
+    buy_thresh = buy_thresh.clip(lower=abs(BUY_THRESHOLD))
     sell_thresh = sell_thresh.clip(upper=-abs(SELL_THRESHOLD))
 
     return buy_thresh, sell_thresh
@@ -264,14 +265,14 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
             df["quarter_end"] = ((df.index.month % 3 == 0) & (df.index.day >= 25)).astype(int)
 
             # Lag returns — explicit temporal context for tree-based models
-            df["return_1d"]  = df["close"].pct_change(1)
-            df["return_5d"]  = df["close"].pct_change(5)
+            df["return_1d"] = df["close"].pct_change(1)
+            df["return_5d"] = df["close"].pct_change(5)
             df["return_10d"] = df["close"].pct_change(10)
             df["return_21d"] = df["close"].pct_change(21)
 
             # Extended momentum factors (Jegadeesh-Titman / Fama-French)
             # 3/6/12-month returns are among the strongest documented return predictors
-            df["return_63d"]  = df["close"].pct_change(63)
+            df["return_63d"] = df["close"].pct_change(63)
             df["return_126d"] = df["close"].pct_change(126)
             df["return_252d"] = df["close"].pct_change(252)
 
@@ -282,7 +283,7 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
             df["bb_position"] = (df["close"] - df["bb_lower"]) / bb_range
 
             df = _compute_labels(df, sp500_df)
-            df["label_1d"]  = _compute_labels_for_horizon(df, sp500_df, 1)
+            df["label_1d"] = _compute_labels_for_horizon(df, sp500_df, 1)
             df["label_21d"] = _compute_labels_for_horizon(df, sp500_df, 21)
 
             # Regression targets — raw relative alpha for each horizon
@@ -308,11 +309,11 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
     # Cross-sectional return rank — where does this ticker rank among all tickers on the same day?
     # Percentile 1.0 = top performer that day, 0.0 = worst. Strong empirical predictor (momentum factor).
     for col, out in [
-        ("return_1d",  "cs_rank_1d"),
-        ("return_5d",  "cs_rank_5d"),
+        ("return_1d", "cs_rank_1d"),
+        ("return_5d", "cs_rank_5d"),
         ("return_21d", "cs_rank_21d"),
         ("return_63d", "cs_rank_63d"),
-        ("return_252d","cs_rank_252d"),
+        ("return_252d", "cs_rank_252d"),
     ]:
         combined[out] = combined.groupby(level=0)[col].rank(pct=True).fillna(0.5)
 

@@ -6,7 +6,8 @@ Best params saved as JSON in MODEL_DIR and auto-loaded by LGBMModel / CatBoostMo
 Usage:
     py training/tune_hyperparams.py
 """
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
@@ -25,11 +26,11 @@ def three_way_split(features: pd.DataFrame, train_pct: float = 0.60, val_pct: fl
     """60/20/20 temporal split — no data leakage across boundaries."""
     all_dates = sorted(pd.to_datetime(features.index).unique())
     train_end = all_dates[int(len(all_dates) * train_pct)]
-    val_end   = all_dates[int(len(all_dates) * (train_pct + val_pct))]
+    val_end = all_dates[int(len(all_dates) * (train_pct + val_pct))]
     idx = pd.to_datetime(features.index)
-    train_df = features[idx <  train_end]
-    val_df   = features[(idx >= train_end) & (idx < val_end)]
-    test_df  = features[idx >= val_end]
+    train_df = features[idx < train_end]
+    val_df = features[(idx >= train_end) & (idx < val_end)]
+    test_df = features[idx >= val_end]
     return train_df, val_df, test_df, train_end, val_end
 
 
@@ -79,32 +80,32 @@ def tune_lgbm(train_df: pd.DataFrame, val_df: pd.DataFrame,
     target_col = _REGRESSION_TARGETS[horizon]
 
     train_df = train_df.dropna(subset=[target_col]).sort_index()
-    val_df   = val_df.dropna(subset=[target_col]).sort_index()
+    val_df = val_df.dropna(subset=[target_col]).sort_index()
 
     X_train = train_df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
     y_train = train_df[target_col].astype(np.float32).values
-    X_val   = val_df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
-    y_val   = val_df[target_col].astype(np.float32).values
+    X_val = val_df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
+    y_val = val_df[target_col].astype(np.float32).values
     weights = _compute_weights(train_df)
 
     cat_indices = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_FEATURES if c in FEATURE_COLUMNS]
 
     def objective(trial: optuna.Trial) -> float:
         params = dict(
-            n_estimators      = 1500,   # capped by early stopping
-            learning_rate     = trial.suggest_float("learning_rate", 0.005, 0.15, log=True),
-            num_leaves        = trial.suggest_int("num_leaves", 31, 127),
-            max_depth         = trial.suggest_int("max_depth", 4, 9),
-            min_child_samples = trial.suggest_int("min_child_samples", 20, 100),
-            subsample         = trial.suggest_float("subsample", 0.6, 1.0),
-            colsample_bytree  = trial.suggest_float("colsample_bytree", 0.6, 1.0),
-            reg_alpha         = trial.suggest_float("reg_alpha", 0.0, 1.0),
-            reg_lambda        = trial.suggest_float("reg_lambda", 0.5, 3.0),
-            alpha             = trial.suggest_float("alpha", 0.5, 2.0),  # Huber threshold
-            objective         = "huber",
-            random_state      = 42,
-            n_jobs            = -1,
-            verbose           = -1,
+            n_estimators=1500,   # capped by early stopping
+            learning_rate=trial.suggest_float("learning_rate", 0.005, 0.15, log=True),
+            num_leaves=trial.suggest_int("num_leaves", 31, 127),
+            max_depth=trial.suggest_int("max_depth", 4, 9),
+            min_child_samples=trial.suggest_int("min_child_samples", 20, 100),
+            subsample=trial.suggest_float("subsample", 0.6, 1.0),
+            colsample_bytree=trial.suggest_float("colsample_bytree", 0.6, 1.0),
+            reg_alpha=trial.suggest_float("reg_alpha", 0.0, 1.0),
+            reg_lambda=trial.suggest_float("reg_lambda", 0.5, 3.0),
+            alpha=trial.suggest_float("alpha", 0.5, 2.0),  # Huber threshold
+            objective="huber",
+            random_state=42,
+            n_jobs=-1,
+            verbose=-1,
         )
         model = lgb.LGBMRegressor(**params)
         model.fit(
@@ -150,29 +151,29 @@ def tune_catboost(train_df: pd.DataFrame, val_df: pd.DataFrame,
     target_col = _REGRESSION_TARGETS[horizon]
 
     train_df = train_df.dropna(subset=[target_col]).sort_index()
-    val_df   = val_df.dropna(subset=[target_col]).sort_index()
+    val_df = val_df.dropna(subset=[target_col]).sort_index()
 
     X_train = train_df[FEATURE_COLUMNS].fillna(0)
     y_train = train_df[target_col].astype(np.float32).values
-    X_val   = val_df[FEATURE_COLUMNS].fillna(0)
-    y_val   = val_df[target_col].astype(np.float32).values
+    X_val = val_df[FEATURE_COLUMNS].fillna(0)
+    y_val = val_df[target_col].astype(np.float32).values
     weights = _compute_weights(train_df)
 
     cat_indices = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_FEATURES if c in FEATURE_COLUMNS]
     train_pool = Pool(X_train, y_train, weight=weights, cat_features=cat_indices)
-    val_pool   = Pool(X_val,   y_val,                   cat_features=cat_indices)
+    val_pool = Pool(X_val, y_val, cat_features=cat_indices)
 
     def objective(trial: optuna.Trial) -> float:
         params = dict(
-            iterations          = 1000,
-            learning_rate       = trial.suggest_float("learning_rate", 0.005, 0.15, log=True),
-            depth               = trial.suggest_int("depth", 4, 8),
-            l2_leaf_reg         = trial.suggest_float("l2_leaf_reg", 1.0, 10.0),
-            bagging_temperature = trial.suggest_float("bagging_temperature", 0.0, 1.0),
-            loss_function       = "RMSE",
-            random_seed         = 42,
-            verbose             = 0,
-            early_stopping_rounds = 60,
+            iterations=1000,
+            learning_rate=trial.suggest_float("learning_rate", 0.005, 0.15, log=True),
+            depth=trial.suggest_int("depth", 4, 8),
+            l2_leaf_reg=trial.suggest_float("l2_leaf_reg", 1.0, 10.0),
+            bagging_temperature=trial.suggest_float("bagging_temperature", 0.0, 1.0),
+            loss_function="RMSE",
+            random_seed=42,
+            verbose=0,
+            early_stopping_rounds=60,
         )
         model = CatBoostRegressor(**params)
         model.fit(train_pool, eval_set=val_pool)
@@ -250,11 +251,11 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
     print("-" * 74)
     for horizon in ("5d", "21d"):
         for name, label in (("lgbm", "LightGBM"), ("catboost", "CatBoost")):
-            res  = summary[horizon].get(name, {})
-            da   = res.get("direction_accuracy", float("nan"))
-            ic   = res.get("spearman_ic",        float("nan"))
-            mae  = res.get("mae",                float("nan")) * 100
-            rmse = res.get("rmse",               float("nan")) * 100
+            res = summary[horizon].get(name, {})
+            da = res.get("direction_accuracy", float("nan"))
+            ic = res.get("spearman_ic", float("nan"))
+            mae = res.get("mae", float("nan")) * 100
+            rmse = res.get("rmse", float("nan")) * 100
             print(f"  {horizon:<8} {label:<12} {da:>7.1%}  {ic:>8.4f}  {mae:>5.2f}%  {rmse:>5.2f}%")
         print()
     print("=" * 74)

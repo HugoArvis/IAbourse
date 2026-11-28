@@ -156,10 +156,10 @@ def _apply_rolling_window(features):
 
 def apply_tft_profile(profile: dict):
     import config as cfg
-    cfg.TFT_HIDDEN_SIZE  = profile["hidden_size"]
-    cfg.TFT_BATCH_SIZE   = profile["batch_size"]
-    cfg.TFT_MAX_EPOCHS   = profile["max_epochs"]
-    cfg.ENCODER_LENGTH   = profile["encoder_length"]
+    cfg.TFT_HIDDEN_SIZE = profile["hidden_size"]
+    cfg.TFT_BATCH_SIZE = profile["batch_size"]
+    cfg.TFT_MAX_EPOCHS = profile["max_epochs"]
+    cfg.ENCODER_LENGTH = profile["encoder_length"]
     if profile["tickers"] is not None:
         cfg.TICKERS = profile["tickers"]
 
@@ -208,12 +208,12 @@ def _print_comparison_table(results: dict):
 
     for horizon in ("5d", "21d"):
         for model_name, label in (("lgbm", "LightGBM"), ("catboost", "CatBoost")):
-            res      = results.get(horizon, {}).get(model_name, {})
-            val_da   = res.get("val",  {}).get("direction_accuracy", float("nan"))
-            test_da  = res.get("test", {}).get("direction_accuracy", float("nan"))
-            test_ic  = res.get("test", {}).get("spearman_ic",        float("nan"))
-            test_mae = res.get("test", {}).get("mae",                 float("nan")) * 100
-            test_rmse= res.get("test", {}).get("rmse",                float("nan")) * 100
+            res = results.get(horizon, {}).get(model_name, {})
+            val_da = res.get("val", {}).get("direction_accuracy", float("nan"))
+            test_da = res.get("test", {}).get("direction_accuracy", float("nan"))
+            test_ic = res.get("test", {}).get("spearman_ic", float("nan"))
+            test_mae = res.get("test", {}).get("mae", float("nan")) * 100
+            test_rmse = res.get("test", {}).get("rmse", float("nan")) * 100
             print(f"  {horizon:<8} {label:<12} {val_da:>9.1%}  {test_da:>10.1%}  "
                   f"{test_ic:>9.4f}  {test_mae:>5.2f}%  {test_rmse:>5.2f}%")
         print()
@@ -221,8 +221,8 @@ def _print_comparison_table(results: dict):
     print("-" * 84)
     print("  IC > 0.02 = useful signal  |  Dir. Acc > 52% = consistent directional edge")
     for horizon in ("5d", "21d"):
-        lgbm_ic = results.get(horizon, {}).get("lgbm",     {}).get("test", {}).get("spearman_ic", 0)
-        cb_ic   = results.get(horizon, {}).get("catboost", {}).get("test", {}).get("spearman_ic", 0)
+        lgbm_ic = results.get(horizon, {}).get("lgbm", {}).get("test", {}).get("spearman_ic", 0)
+        cb_ic = results.get(horizon, {}).get("catboost", {}).get("test", {}).get("spearman_ic", 0)
         if lgbm_ic > cb_ic:
             winner = f"LightGBM  (IC {lgbm_ic:.4f} vs {cb_ic:.4f})"
         elif cb_ic > lgbm_ic:
@@ -256,7 +256,7 @@ def run_comparison(features, profile):
         lgbm_prod = LGBMModel.train(train_val_df, horizon=horizon)
         lgbm_prod.save()
         results[horizon]["lgbm"] = {
-            "val":  lgbm_eval.evaluate(val_df),
+            "val": lgbm_eval.evaluate(val_df),
             "test": lgbm_eval.evaluate(test_df),
         }
 
@@ -265,7 +265,7 @@ def run_comparison(features, profile):
         cb_prod = CatBoostModel.train(train_val_df, horizon=horizon)
         cb_prod.save()
         results[horizon]["catboost"] = {
-            "val":  cb_eval.evaluate(val_df),
+            "val": cb_eval.evaluate(val_df),
             "test": cb_eval.evaluate(test_df),
         }
 

@@ -16,19 +16,19 @@ class RLScorer:
     Falls back gracefully to MultiHorizonScorer if no PPO checkpoint exists.
     """
 
-    _CKPT      = os.path.join(MODEL_DIR, "ppo_agent.zip")
+    _CKPT = os.path.join(MODEL_DIR, "ppo_agent.zip")
     _CKPT_BEST = os.path.join(MODEL_DIR, "best_model.zip")
 
     def __init__(self):
-        self._ppo   = None
-        self._base  = None   # MultiHorizonScorer
+        self._ppo = None
+        self._base = None   # MultiHorizonScorer
 
     def load(self) -> "RLScorer":
         from models.strategy_scorer import MultiHorizonScorer
         self._base = MultiHorizonScorer().load()
 
         ckpt = self._CKPT if os.path.exists(self._CKPT) else (
-               self._CKPT_BEST if os.path.exists(self._CKPT_BEST) else None)
+            self._CKPT_BEST if os.path.exists(self._CKPT_BEST) else None)
         if ckpt is None:
             logger.info("No PPO checkpoint found — RLScorer will use base scorer only")
             return self
@@ -65,22 +65,22 @@ class RLScorer:
 
         # Build 8-dim observation for PPO
         last = features.iloc[-1]
-        pred_5d  = result["predicted_return_5d"]  / 100.0   # % → fraction
+        pred_5d = result["predicted_return_5d"] / 100.0   # % → fraction
         pred_21d = result["predicted_return_21d"] / 100.0
         confidence = result["confidence"]
-        stress     = result["stress"]
-        vix_z      = float(last.get("vix_z",           0.0))
-        mkt_dd     = float(last.get("market_drawdown", 0.0))
+        stress = result["stress"]
+        vix_z = float(last.get("vix_z", 0.0))
+        mkt_dd = float(last.get("market_drawdown", 0.0))
 
         obs = np.array([
-            np.clip(pred_5d  / MAX_PREDICTED_RETURN, -3.0, 3.0),
+            np.clip(pred_5d / MAX_PREDICTED_RETURN, -3.0, 3.0),
             np.clip(pred_21d / MAX_PREDICTED_RETURN, -3.0, 3.0),
             confidence,
-            np.clip(vix_z / 3.0,   -3.0, 3.0),
-            np.clip(mkt_dd / 0.5,  -2.0, 0.0),
+            np.clip(vix_z / 3.0, -3.0, 3.0),
+            np.clip(mkt_dd / 0.5, -2.0, 0.0),
             stress,
             np.clip(current_position_pct / 100.0, -1.0, 1.0),
-            -np.clip(episode_drawdown,              0.0, 1.0),
+            -np.clip(episode_drawdown, 0.0, 1.0),
         ], dtype=np.float32)
 
         try:

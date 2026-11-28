@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import traceback
 import numpy as np
@@ -77,8 +78,8 @@ def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
             preds[crisis_mask.values].values,
             labels=[0], average="macro", zero_division=0,
         )
-        results["sell_recall_crisis"]  = round(sell_recall, 3)
-        results["n_crisis_days"]       = n_crisis
+        results["sell_recall_crisis"] = round(sell_recall, 3)
+        results["n_crisis_days"] = n_crisis
         logger.info(f"SELL recall (crash periods): {sell_recall:.3f}  ({n_crisis} days)")
     else:
         logger.warning("No crisis-period days in validation set — SELL recall not computed")
@@ -96,7 +97,7 @@ def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
             labels=[2], average="macro", zero_division=0,
         )
         results["buy_recall_recovery"] = round(buy_recall, 3)
-        results["n_recovery_days"]     = n_recovery
+        results["n_recovery_days"] = n_recovery
         logger.info(f"BUY recall (recovery periods): {buy_recall:.3f}  ({n_recovery} days)")
     else:
         logger.warning("No recovery-period days in validation set — BUY recall not computed")
@@ -118,10 +119,10 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
 
     for fold in range(1, n_folds + 1):
         train_end = all_dates[fold_size * fold - 1]
-        val_end   = all_dates[min(fold_size * (fold + 1) - 1, len(all_dates) - 1)]
+        val_end = all_dates[min(fold_size * (fold + 1) - 1, len(all_dates) - 1)]
 
         train_df = features_df[features_df.index <= train_end]
-        val_df   = features_df[(features_df.index > train_end) & (features_df.index <= val_end)]
+        val_df = features_df[(features_df.index > train_end) & (features_df.index <= val_end)]
 
         if train_df.empty or val_df.empty:
             logger.warning(f"Fold {fold}: empty split — skipping")
@@ -156,17 +157,17 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
         return {}
 
     overall_acc = accuracy_score(all_labels, all_preds)
-    kappa       = cohen_kappa_score(all_labels, all_preds)
-    report      = classification_report(
+    kappa = cohen_kappa_score(all_labels, all_preds)
+    report = classification_report(
         all_labels, all_preds,
         target_names=["SELL", "HOLD", "BUY"],
         output_dict=True,
         zero_division=0,
     )
 
-    sell_prec        = report["SELL"]["precision"]
-    buy_prec         = report["BUY"]["precision"]
-    macro_f1         = report["macro avg"]["f1-score"]
+    sell_prec = report["SELL"]["precision"]
+    buy_prec = report["BUY"]["precision"]
+    macro_f1 = report["macro avg"]["f1-score"]
     active_precision = (sell_prec + buy_prec) / 2.0
 
     # Exit criterion: directional signals must be meaningfully better than random
@@ -187,11 +188,11 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
     )
 
     return {
-        "accuracy":         overall_acc,
-        "kappa":            round(kappa, 3),
+        "accuracy": overall_acc,
+        "kappa": round(kappa, 3),
         "active_precision": round(active_precision, 3),
-        "macro_f1":         round(macro_f1, 3),
-        "report":           report,
+        "macro_f1": round(macro_f1, 3),
+        "report": report,
         "exit_criterion_met": passed,
         **regime,
     }
@@ -199,8 +200,8 @@ def walk_forward_evaluate(features_df: pd.DataFrame, horizon: str = "5d", n_fold
 
 # ── Crisis stress test ────────────────────────────────────────────────────────
 
-CRISIS_START          = "2020-02-01"
-CRISIS_END            = "2020-04-30"
+CRISIS_START = "2020-02-01"
+CRISIS_END = "2020-04-30"
 CRISIS_SELL_THRESHOLD = 0.50
 
 
@@ -212,7 +213,7 @@ def crisis_stress_test(features_df: pd.DataFrame, horizon: str = "5d") -> dict:
     logger.info("Running COVID-crash stress test (Feb–Apr 2020)...")
     target_col = _TARGET[horizon]
 
-    pre_crash    = features_df[features_df.index < CRISIS_START]
+    pre_crash = features_df[features_df.index < CRISIS_START]
     crash_window = features_df[
         (features_df.index >= CRISIS_START) & (features_df.index <= CRISIS_END)
     ]
@@ -238,9 +239,9 @@ def crisis_stress_test(features_df: pd.DataFrame, horizon: str = "5d") -> dict:
     X = df_crash[FEATURE_COLUMNS].fillna(0).astype(np.float32)
     preds = model.predict(X).tolist()
 
-    n_days    = len(preds)
+    n_days = len(preds)
     sell_rate = preds.count(0) / n_days if n_days else 0.0
-    passed    = sell_rate >= CRISIS_SELL_THRESHOLD
+    passed = sell_rate >= CRISIS_SELL_THRESHOLD
 
     logger.info(
         f"Crisis stress test [{horizon}]: {n_days} days, "
@@ -256,7 +257,7 @@ if __name__ == "__main__":
     # Confirm ~25/50/25 label distribution
     for col, lbl in [("label", "5d"), ("label_1d", "1d"), ("label_21d", "21d")]:
         dist = features[col].value_counts(normalize=True).sort_index()
-        print(f"Label distribution [{lbl}]: SELL={dist.get(0,0):.1%}  HOLD={dist.get(1,0):.1%}  BUY={dist.get(2,0):.1%}")
+        print(f"Label distribution [{lbl}]: SELL={dist.get(0, 0):.1%}  HOLD={dist.get(1, 0):.1%}  BUY={dist.get(2, 0):.1%}")
 
     all_results = {}
     for hz in ("5d", "21d"):      # 1d dropped — too noisy for directional signals
@@ -275,9 +276,9 @@ if __name__ == "__main__":
                     r = rep[cls]
                     print(f"    {cls}: prec={r['precision']:.2f}  rec={r['recall']:.2f}  f1={r['f1-score']:.2f}")
             if "sell_recall_crisis" in results:
-                print(f"  SELL recall on crash periods  : {results['sell_recall_crisis']:.3f}  ({results.get('n_crisis_days',0)} days)")
+                print(f"  SELL recall on crash periods  : {results['sell_recall_crisis']:.3f}  ({results.get('n_crisis_days', 0)} days)")
             if "buy_recall_recovery" in results:
-                print(f"  BUY recall on recovery periods: {results['buy_recall_recovery']:.3f}  ({results.get('n_recovery_days',0)} days)")
+                print(f"  BUY recall on recovery periods: {results['buy_recall_recovery']:.3f}  ({results.get('n_recovery_days', 0)} days)")
 
     print("\n── Crisis stress test [5d] (COVID crash Feb–Apr 2020) ────")
     crisis = crisis_stress_test(features, horizon="5d")
@@ -290,10 +291,10 @@ if __name__ == "__main__":
         print(f"  Result         : {'PASS ✓' if crisis['passed'] else 'FAIL'}")
 
     print()
-    results_5d  = all_results.get("5d",  {})
+    results_5d = all_results.get("5d", {})
     results_21d = all_results.get("21d", {})
     all_pass = (
-        results_5d.get("exit_criterion_met",  False)
+        results_5d.get("exit_criterion_met", False)
         and results_21d.get("exit_criterion_met", False)
         and (crisis.get("passed") or crisis.get("skipped"))
     )

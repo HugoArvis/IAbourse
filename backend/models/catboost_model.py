@@ -7,7 +7,7 @@ from config import MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE, CRISIS_PERIODS, CRISIS_
 from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
 
 _HORIZON_MAP = {
-    "5d":  ("relative_return",     "catboost_5d.cbm"),
+    "5d": ("relative_return", "catboost_5d.cbm"),
     "21d": ("relative_return_21d", "catboost_21d.cbm"),
 }
 
@@ -157,15 +157,15 @@ class CatBoostModel:
             y_pred = self._model.predict(X).astype(np.float32)
 
             dir_acc = float((np.sign(y_pred) == np.sign(y_true)).mean())
-            ic, _   = stats.spearmanr(y_pred, y_true)
-            mae     = float(mean_absolute_error(y_true, y_pred))
-            rmse    = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+            ic, _ = stats.spearmanr(y_pred, y_true)
+            mae = float(mean_absolute_error(y_true, y_pred))
+            rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
             return {
                 "direction_accuracy": dir_acc,
-                "spearman_ic":        float(ic) if not np.isnan(ic) else 0.0,
-                "mae":                mae,
-                "rmse":               rmse,
+                "spearman_ic": float(ic) if not np.isnan(ic) else 0.0,
+                "mae": mae,
+                "rmse": rmse,
             }
         except Exception as e:
             logger.error(f"CatBoost [{self._horizon}] evaluation failed: {e}")

@@ -98,6 +98,7 @@ def build_candidates() -> pd.DataFrame:
     # (e.g. Exxon Mobil whose ticker now points to a new holding-company CIK).
     holdings["company_id"] = holdings["entity"].map(company)
     missing = holdings[~holdings["company_id"].isin(cand["company_id"])]
+
     def compact(name_key: str) -> str:  # "EXXONMOBIL HOLDINGS" == "EXXON MOBIL"
         return name_key.replace("HOLDINGS", "").replace("GROUP", "").replace(" ", "")
 

@@ -45,15 +45,15 @@ class TradingEnv(gym.Env):
 
     def _obs(self, idx: int) -> np.ndarray:
         row = self._df.iloc[idx]
-        pred_5d  = float(row.get("pred_5d",  0.0))
+        pred_5d = float(row.get("pred_5d", 0.0))
         pred_21d = float(row.get("pred_21d", 0.0))
         confidence = float(np.clip(abs(pred_21d) / MAX_PREDICTED_RETURN, 0.0, 1.0))
-        vix_z    = float(row.get("vix_z",           0.0))
-        mkt_dd   = float(row.get("market_drawdown", 0.0))
-        stress   = float(np.clip(vix_z / 3.0 + abs(mkt_dd) * 5.0, 0.0, 1.0))
-        ep_dd    = float((self._peak - self._portfolio) / max(self._peak, 1e-8))
+        vix_z = float(row.get("vix_z", 0.0))
+        mkt_dd = float(row.get("market_drawdown", 0.0))
+        stress = float(np.clip(vix_z / 3.0 + abs(mkt_dd) * 5.0, 0.0, 1.0))
+        ep_dd = float((self._peak - self._portfolio) / max(self._peak, 1e-8))
         return np.array([
-            pred_5d  / MAX_PREDICTED_RETURN,  # ~[-1, 1]
+            pred_5d / MAX_PREDICTED_RETURN,  # ~[-1, 1]
             pred_21d / MAX_PREDICTED_RETURN,  # ~[-1, 1]
             confidence,                        # [0, 1]
             vix_z / 3.0,                       # ~[-1, 1]
@@ -78,10 +78,10 @@ class TradingEnv(gym.Env):
 
     def step(self, action):
         new_pos = float(np.clip(action[0], -1.0, 1.0))
-        delta   = abs(new_pos - self._position)
+        delta = abs(new_pos - self._position)
 
-        cur  = self._start + self._step
-        nxt  = cur + 1
+        cur = self._start + self._step
+        nxt = cur + 1
         done = self._step + 1 >= EPISODE_LENGTH or nxt >= len(self._df)
         safe = min(nxt, len(self._df) - 1)
 

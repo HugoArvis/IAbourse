@@ -16,7 +16,8 @@ Usage:
     py train.py   →  select profile 9 (full) or 10 (quick test)
 """
 
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
@@ -51,7 +52,7 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
     train_df, val_df, _, train_cut, val_cut = three_way_split(features)
 
     lgbm21 = LGBMModel.load_latest("21d")
-    cb5    = CatBoostModel.load_latest("5d")
+    cb5 = CatBoostModel.load_latest("5d")
 
     if lgbm21 is None:
         raise RuntimeError("LGBM 21d model not found — run train.py profile 1 or 5 first")
@@ -66,7 +67,7 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
                 X[c] = X[c].astype(int)
         df = df.copy()
         df["pred_21d"] = lgbm21._model.predict(X)
-        df["pred_5d"]  = cb5._model.predict(X) if cb5 else np.zeros(len(df))
+        df["pred_5d"] = cb5._model.predict(X) if cb5 else np.zeros(len(df))
         return df
 
     def _to_dict(df: pd.DataFrame) -> dict:
@@ -78,7 +79,7 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
         return out
 
     train_dict = _to_dict(train_df)
-    val_dict   = _to_dict(val_df)
+    val_dict = _to_dict(val_df)
     logger.info(f"RL tickers — train: {len(train_dict)}, val: {len(val_dict)}")
     return train_dict, val_dict
 
@@ -106,10 +107,10 @@ def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
         ep_returns.append(env._portfolio - 1.0)
 
     return {
-        "mean_sharpe":    float(np.mean(sharpes)),
+        "mean_sharpe": float(np.mean(sharpes)),
         "worst_drawdown": float(np.max(drawdowns)),
-        "mean_return":    float(np.mean(ep_returns)),
-        "n_episodes":     n_episodes,
+        "mean_return": float(np.mean(ep_returns)),
+        "n_episodes": n_episodes,
     }
 
 
@@ -169,7 +170,7 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
     print()
 
     sharpe_ok = metrics["mean_sharpe"] > 1.0
-    dd_ok     = metrics["worst_drawdown"] < 0.20
+    dd_ok = metrics["worst_drawdown"] < 0.20
     if sharpe_ok and dd_ok:
         print("  ✓ EXIT CRITERION MET — model ready for paper trading")
     else:

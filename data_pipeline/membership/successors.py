@@ -115,4 +115,4 @@ if __name__ == "__main__":
     names = load_holdings().groupby("entity")["name"].last()
     print(f"{len(links)} successor links")
     print(links.assign(pred=links["pred"].map(names), succ=links["succ"].map(names))
-               [["filed", "form", "pred", "succ", "ticker", "n_ok", "n_px"]].to_string(index=False))
+          [["filed", "form", "pred", "succ", "ticker", "n_ok", "n_px"]].to_string(index=False))

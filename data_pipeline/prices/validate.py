@@ -91,7 +91,10 @@ def pick_periods(checks: pd.DataFrame) -> pd.DataFrame:
     g = agg.groupby(keys)
     agg["run"] = g["ok"].transform(lambda s: (s != s.shift()).cumsum())
     agg["run_len"] = agg.groupby(keys + ["run"])["ok"].transform("size")
-    contradicted = lambda col: g[col].shift().fillna(False).astype(bool)  # noqa: E731
+
+    def contradicted(col):
+        return g[col].shift().fillna(False).astype(bool)
+
     agg["prev_bad"] = contradicted("has_px") & ~contradicted("ok")
     agg["next_bad"] = (g["has_px"].shift(-1).fillna(False).astype(bool)
                        & ~g["ok"].shift(-1).fillna(False).astype(bool))

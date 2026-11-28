@@ -39,7 +39,7 @@ class MultiHorizonScorer:
     """
 
     def __init__(self):
-        self._model_5d  = None
+        self._model_5d = None
         self._model_21d = None
 
     def load(self) -> "MultiHorizonScorer":
@@ -47,7 +47,7 @@ class MultiHorizonScorer:
         from models.catboost_model import CatBoostModel
         # 5d: CatBoost (IC 0.046, better rank signal — but direction acc ~50%, 5% weight only)
         # 21d: LightGBM (IC 0.123, direction acc 55.4% — primary decision driver)
-        self._model_5d  = CatBoostModel.load_latest(horizon="5d")
+        self._model_5d = CatBoostModel.load_latest(horizon="5d")
         self._model_21d = LGBMModel.load_latest(horizon="21d")
         loaded = sum(m is not None for m in [self._model_5d, self._model_21d])
         logger.info(f"MultiHorizonScorer: {loaded}/2 models loaded (CatBoost-5d + LGBM-21d)")
@@ -59,23 +59,23 @@ class MultiHorizonScorer:
 
     def score(self, features: pd.DataFrame) -> dict:
         # --- per-horizon predicted returns ---
-        ret_5d  = self._model_5d.predict_latest(features)  if self._model_5d  else 0.0
+        ret_5d = self._model_5d.predict_latest(features) if self._model_5d else 0.0
         ret_21d = self._model_21d.predict_latest(features) if self._model_21d else 0.0
 
         # --- regime stress: 0 = calm, 1 = crisis ---
         try:
-            last            = features.iloc[-1]
-            vix_z           = float(last.get("vix_z", 0.0))
+            last = features.iloc[-1]
+            vix_z = float(last.get("vix_z", 0.0))
             market_drawdown = float(last.get("market_drawdown", 0.0))
             stress = float(np.clip(vix_z / 3.0 + abs(market_drawdown) * 5.0, 0.0, 1.0))
         except Exception:
             stress = 0.0
 
         # --- horizon fusion: 5d noise-weighted, 21d dominates ---
-        w5  = HORIZON_WEIGHTS["weekly"]   # 0.10 (calm) → 0.05 (crisis)
+        w5 = HORIZON_WEIGHTS["weekly"]   # 0.10 (calm) → 0.05 (crisis)
         w21 = HORIZON_WEIGHTS["monthly"]  # 0.90 (calm) → 0.95 (crisis)
         # Apply stress adjustment
-        w5  = max(0.02, w5  - 0.05 * stress)
+        w5 = max(0.02, w5 - 0.05 * stress)
         w21 = 1.0 - w5
         ret = w5 * ret_5d + w21 * ret_21d
 
@@ -87,24 +87,24 @@ class MultiHorizonScorer:
 
         if confidence < CONFIDENCE_THRESHOLD:
             position_pct = 0.0
-            score        = SCORE_NEUTRAL
+            score = SCORE_NEUTRAL
         else:
             # Stress reduces position by up to 50% in crisis regimes
             stress_factor = 1.0 - 0.5 * stress
-            position_pct  = round(raw_position * stress_factor * 100.0, 1)
-            score         = float(np.clip(5.0 + raw_position * 5.0, 0.0, 10.0))
+            position_pct = round(raw_position * stress_factor * 100.0, 1)
+            score = float(np.clip(5.0 + raw_position * 5.0, 0.0, 10.0))
 
         return {
-            "score":                   round(score, 2),
-            "position_pct":            position_pct,
-            "predicted_return_5d":     round(ret_5d  * 100, 2),   # % vs SP500
-            "predicted_return_21d":    round(ret_21d * 100, 2),
-            "predicted_return":        round(ret     * 100, 2),    # combined signal
-            "confidence":              round(confidence, 4),
-            "stress":                  round(stress, 3),
-            "strategy":                _strategy_text(ret, confidence, stress),
+            "score": round(score, 2),
+            "position_pct": position_pct,
+            "predicted_return_5d": round(ret_5d * 100, 2),   # % vs SP500
+            "predicted_return_21d": round(ret_21d * 100, 2),
+            "predicted_return": round(ret * 100, 2),    # combined signal
+            "confidence": round(confidence, 4),
+            "stress": round(stress, 3),
+            "strategy": _strategy_text(ret, confidence, stress),
             "horizons": {
-                "weekly":  {"predicted_return_pct": round(ret_5d  * 100, 2)},
+                "weekly": {"predicted_return_pct": round(ret_5d * 100, 2)},
                 "monthly": {"predicted_return_pct": round(ret_21d * 100, 2)},
             },
         }

@@ -111,29 +111,29 @@ class AlpacaConnector:
 
             # Sharpe (annualised, daily returns)
             mean_r = daily_returns.mean()
-            std_r  = daily_returns.std() + 1e-9
-            sharpe  = float(mean_r / std_r * np.sqrt(252))
+            std_r = daily_returns.std() + 1e-9
+            sharpe = float(mean_r / std_r * np.sqrt(252))
 
             # Sortino (downside deviation only)
             neg = daily_returns[daily_returns < 0]
             sortino = float(mean_r / (neg.std() + 1e-9) * np.sqrt(252)) if len(neg) > 1 else 0.0
 
             # Max drawdown
-            peak    = np.maximum.accumulate(equity)
-            dd      = (peak - equity) / (peak + 1e-9)
-            max_dd  = float(dd.max())
+            peak = np.maximum.accumulate(equity)
+            dd = (peak - equity) / (peak + 1e-9)
+            max_dd = float(dd.max())
 
             # Win rate from closed orders
             n_trades, n_wins = self._count_trades(return_wins=True)
             win_rate = (n_wins / n_trades) if n_trades > 0 else 0.0
 
             return {
-                "sharpe":       round(sharpe,  3),
-                "sortino":      round(sortino, 3),
-                "max_drawdown": round(max_dd,  4),
-                "win_rate":     round(win_rate, 4),
-                "n_trades":     n_trades,
-                "total_value":  portfolio["total_value"],
+                "sharpe": round(sharpe, 3),
+                "sortino": round(sortino, 3),
+                "max_drawdown": round(max_dd, 4),
+                "win_rate": round(win_rate, 4),
+                "n_trades": n_trades,
+                "total_value": portfolio["total_value"],
             }
         except Exception as e:
             logger.error(f"get_metrics failed: {e}")
@@ -298,12 +298,12 @@ class AlpacaConnector:
                         avg_volume=5_000_000,
                     )
                     result.update({
-                        "ticker":           ticker,
-                        "score":            score,
-                        "position_pct":     position_pct,
-                        "should_trade":     should_trade,
+                        "ticker": ticker,
+                        "score": score,
+                        "position_pct": position_pct,
+                        "should_trade": should_trade,
                         "current_position": current_pos_pct,
-                        "portfolio_value":  total_value,
+                        "portfolio_value": total_value,
                     })
                     candidates.append(result)
                 except Exception as e:

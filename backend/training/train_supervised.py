@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import mlflow
@@ -49,7 +50,7 @@ def train_supervised(features_df, n_folds: int = 5):
         early_stop = EarlyStopping(monitor="val_loss", patience=TFT_EARLY_STOPPING_PATIENCE, mode="min")
         checkpoint = ModelCheckpoint(
             dirpath=MODEL_DIR,
-            filename=f"tft_fold{fold+1}",
+            filename=f"tft_fold{fold + 1}",
             monitor="val_loss",
             save_top_k=1,
         )
@@ -64,7 +65,7 @@ def train_supervised(features_df, n_folds: int = 5):
             devices=1,
         )
 
-        with mlflow.start_run(run_name=f"tft_fold{fold+1}", nested=True):
+        with mlflow.start_run(run_name=f"tft_fold{fold + 1}", nested=True):
             mlflow.log_params({"fold": fold + 1, "train_cut": train_cut, "val_cut": val_cut})
             trainer.fit(model, train_dataloaders=train_dl, val_dataloaders=val_dl)
             val_loss = trainer.callback_metrics.get("val_loss", float("inf"))
