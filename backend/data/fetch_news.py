@@ -1,14 +1,18 @@
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
+import os
+import sys
+from datetime import datetime, timedelta, timezone
+
 import finnhub
 import pandas as pd
-from datetime import datetime, timedelta, timezone
 from loguru import logger
-from config import FINNHUB_API_KEY, TICKERS, DATA_DIR
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DATA_DIR, FINNHUB_API_KEY, TICKERS  # noqa: E402
 
 try:
     from models.finbert_embedder import FinBERTEmbedder
+
     _FINBERT_AVAILABLE = True
 except Exception:
     _FINBERT_AVAILABLE = False
@@ -34,7 +38,8 @@ def fetch_news_for_ticker(
 ) -> pd.DataFrame:
     """
     Fetch recent news, run FinBERT, return daily aggregated sentiment.
-    Cutoff: only articles before 09:30 NY of each day (data leakage rule).
+    Cutoff: only articles before 09:30 NY of each day (data leakage
+    rule).
     """
     end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days_back)
@@ -67,7 +72,8 @@ def fetch_news_for_ticker(
 
     if embedder is not None:
         texts = df["text"].tolist()
-        scores = embedder.score_batch(texts)  # list of dicts {positive, negative, neutral}
+        # list of dicts {positive, negative, neutral}
+        scores = embedder.score_batch(texts)
         df["sentiment_pos"] = [s["positive"] for s in scores]
         df["sentiment_neg"] = [s["negative"] for s in scores]
         df["sentiment_neu"] = [s["neutral"] for s in scores]
@@ -78,21 +84,30 @@ def fetch_news_for_ticker(
         df["sentiment_neu"] = 0.334
         df["compound"] = 0.0
 
-    # Aggregate to daily — only articles before 09:30 NY count for that day
+    # Aggregate to daily — only articles before 09:30 NY count for that
+    # day
     from zoneinfo import ZoneInfo
+
     ny = ZoneInfo("America/New_York")
     df["date"] = df["datetime"].apply(
-        lambda dt: (dt.astimezone(ny).date() if dt.astimezone(ny).hour < 9
-                    or (dt.astimezone(ny).hour == 9 and dt.astimezone(ny).minute < 30)
-                    else (dt.astimezone(ny) + timedelta(days=1)).date())
+        lambda dt: (
+            dt.astimezone(ny).date()
+            if dt.astimezone(ny).hour < 9
+            or (dt.astimezone(ny).hour == 9 and dt.astimezone(ny).minute < 30)
+            else (dt.astimezone(ny) + timedelta(days=1)).date()
+        )
     )
-    daily = df.groupby("date").agg(
-        sentiment_pos=("sentiment_pos", "mean"),
-        sentiment_neg=("sentiment_neg", "mean"),
-        sentiment_neu=("sentiment_neu", "mean"),
-        compound=("compound", "mean"),
-        n_articles=("text", "count"),
-    ).reset_index()
+    daily = (
+        df.groupby("date")
+        .agg(
+            sentiment_pos=("sentiment_pos", "mean"),
+            sentiment_neg=("sentiment_neg", "mean"),
+            sentiment_neu=("sentiment_neu", "mean"),
+            compound=("compound", "mean"),
+            n_articles=("text", "count"),
+        )
+        .reset_index()
+    )
     daily["date"] = pd.to_datetime(daily["date"])
     daily.set_index("date", inplace=True)
     return daily
@@ -106,18 +121,25 @@ def fetch_and_embed_news(days_back: int = 7) -> dict[str, pd.DataFrame]:
     embedder = None
     if _FINBERT_AVAILABLE:
         from models.finbert_embedder import FinBERTEmbedder
+
         embedder = FinBERTEmbedder()
 
     results = {}
     for ticker in TICKERS:
         path = _news_path(ticker)
-        existing = pd.read_parquet(path) if os.path.exists(path) else pd.DataFrame()
-        daily = fetch_news_for_ticker(ticker, client, embedder, days_back=days_back)
+        existing = (
+            pd.read_parquet(path) if os.path.exists(path) else pd.DataFrame()
+        )
+        daily = fetch_news_for_ticker(
+            ticker, client, embedder, days_back=days_back
+        )
         if daily.empty:
             results[ticker] = existing
             continue
         if not existing.empty:
-            combined = pd.concat([existing, daily[~daily.index.isin(existing.index)]])
+            combined = pd.concat(
+                [existing, daily[~daily.index.isin(existing.index)]]
+            )
             combined.sort_index(inplace=True)
         else:
             combined = daily

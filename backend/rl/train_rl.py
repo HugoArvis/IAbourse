@@ -1,12 +1,14 @@
 """
-RL training — PPO fine-tuning on top of LightGBM/CatBoost base predictions.
+RL training — PPO fine-tuning on top of LightGBM/CatBoost base
+predictions.
 
 Architecture:
-  - LightGBM (21d) + CatBoost (5d) predictions are pre-computed for every
-    historical row, compressing the 60-day feature window into two floats.
-  - The PPO agent receives a compact 8-dim observation and learns WHEN and
-    HOW MUCH to act on those predictions, taking into account regime stress
-    and current portfolio state.
+  - LightGBM (21d) + CatBoost (5d) predictions are pre-computed for
+    every historical row, compressing the 60-day feature window into two
+    floats.
+  - The PPO agent receives a compact 8-dim observation and learns WHEN
+    and HOW MUCH to act on those predictions, taking into account regime
+    stress and current portfolio state.
   - Action space: target position in [-1, 1] (i.e., -100% to +100%).
 
 Exit criterion (CLAUDE.md Phase 2):
@@ -16,48 +18,65 @@ Usage:
     py train.py   →  select profile 9 (full) or 10 (quick test)
 """
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
+import sys
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from config import (
-    PPO_LR, PPO_N_STEPS, PPO_BATCH_SIZE, PPO_N_EPOCHS,
-    PPO_GAMMA, PPO_GAE_LAMBDA, PPO_CLIP_RANGE, PPO_ENT_COEF,
-    PPO_TOTAL_TIMESTEPS, MODEL_DIR,
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import (  # noqa: E402
+    MODEL_DIR,
+    PPO_BATCH_SIZE,
+    PPO_CLIP_RANGE,
+    PPO_ENT_COEF,
+    PPO_GAE_LAMBDA,
+    PPO_GAMMA,
+    PPO_LR,
+    PPO_N_EPOCHS,
+    PPO_N_STEPS,
+    PPO_TOTAL_TIMESTEPS,
 )
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
-from rl.trading_env import TradingEnv, EPISODE_LENGTH
-from rl.callbacks import build_callbacks
-from rl.reward_functions import _episode_sharpe
+from data.feature_engineering import (  # noqa: E402
+    CATEGORICAL_FEATURES,
+    FEATURE_COLUMNS,
+)
+from rl.callbacks import build_callbacks  # noqa: E402
+from rl.reward_functions import _episode_sharpe  # noqa: E402
+from rl.trading_env import EPISODE_LENGTH, TradingEnv  # noqa: E402
 
+# ── Data preparation ──────────────────────────────────────────────────
 
-# ── Data preparation ──────────────────────────────────────────────────────────
 
 def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
     """
     1. 60/20/20 temporal split (train / val / test — test unused here).
-    2. Pre-compute LightGBM-21d and CatBoost-5d predictions for every row.
-       This avoids calling models inside the hot training loop.
+    2. Pre-compute LightGBM-21d and CatBoost-5d predictions for every
+       row. This avoids calling models inside the hot training loop.
     3. Return (train_dict, val_dict): ticker → DataFrame.
     """
-    from training.tune_hyperparams import three_way_split
-    from models.lgbm_model import LGBMModel
     from models.catboost_model import CatBoostModel
+    from models.lgbm_model import LGBMModel
+    from training.tune_hyperparams import three_way_split
 
     train_df, val_df, _, train_cut, val_cut = three_way_split(features)
 
     lgbm21 = LGBMModel.load_latest("21d")
-    cb5    = CatBoostModel.load_latest("5d")
+    cb5 = CatBoostModel.load_latest("5d")
 
     if lgbm21 is None:
-        raise RuntimeError("LGBM 21d model not found — run train.py profile 1 or 5 first")
+        raise RuntimeError(
+            "LGBM 21d model not found — run train.py profile 1 or 5 first"
+        )
 
-    logger.info(f"RL data: train up to {train_cut.date()} ({len(train_df):,} rows) | "
-                f"val {train_cut.date()} → {val_cut.date()} ({len(val_df):,} rows)")
+    logger.info(
+        f"RL data: train up to {train_cut.date()} ({len(train_df):,} rows) | "
+        f"val {train_cut.date()} → {val_cut.date()} ({len(val_df):,} rows)"
+    )
 
     def _add_preds(df: pd.DataFrame) -> pd.DataFrame:
         X = df[FEATURE_COLUMNS].fillna(0)
@@ -66,7 +85,7 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
                 X[c] = X[c].astype(int)
         df = df.copy()
         df["pred_21d"] = lgbm21._model.predict(X)
-        df["pred_5d"]  = cb5._model.predict(X) if cb5 else np.zeros(len(df))
+        df["pred_5d"] = cb5._model.predict(X) if cb5 else np.zeros(len(df))
         return df
 
     def _to_dict(df: pd.DataFrame) -> dict:
@@ -78,12 +97,13 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
         return out
 
     train_dict = _to_dict(train_df)
-    val_dict   = _to_dict(val_df)
+    val_dict = _to_dict(val_df)
     logger.info(f"RL tickers — train: {len(train_dict)}, val: {len(val_dict)}")
     return train_dict, val_dict
 
 
-# ── Evaluation ────────────────────────────────────────────────────────────────
+# ── Evaluation ────────────────────────────────────────────────────────
+
 
 def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
     """
@@ -106,24 +126,30 @@ def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
         ep_returns.append(env._portfolio - 1.0)
 
     return {
-        "mean_sharpe":    float(np.mean(sharpes)),
+        "mean_sharpe": float(np.mean(sharpes)),
         "worst_drawdown": float(np.max(drawdowns)),
-        "mean_return":    float(np.mean(ep_returns)),
-        "n_episodes":     n_episodes,
+        "mean_return": float(np.mean(ep_returns)),
+        "n_episodes": n_episodes,
     }
 
 
-# ── Training ──────────────────────────────────────────────────────────────────
+# ── Training ──────────────────────────────────────────────────────────
 
-def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS) -> PPO:
+
+def train_rl(
+    features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS
+) -> PPO:
     os.makedirs(MODEL_DIR, exist_ok=True)
 
     print("  Preparing RL data (pre-computing model predictions)...")
     train_dict, val_dict = prepare_rl_data(features)
-    print(f"  Train tickers: {len(train_dict)}  |  Val tickers: {len(val_dict)}")
+    print(
+        f"  Train tickers: {len(train_dict)}  |  Val tickers: {len(val_dict)}"
+    )
 
-    # DummyVecEnv: works on all platforms (SubprocVecEnv deadlocks on Windows
-    # because closure-captured DataFrames can't be pickled across spawn processes)
+    # DummyVecEnv: works on all platforms (SubprocVecEnv deadlocks on
+    # Windows because closure-captured DataFrames can't be pickled
+    # across spawn processes)
     n_envs = 4
     env = DummyVecEnv([lambda: TradingEnv(train_dict)] * n_envs)
     print(f"  Vectorized environment ready ({n_envs} envs, DummyVecEnv)")
@@ -147,8 +173,13 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
 
     print(f"\n  Starting PPO training ({total_timesteps:,} timesteps)...")
     print("  Training stats will appear every ~2 048 steps\n")
-    logger.info(f"PPO training: {total_timesteps:,} timesteps · {len(train_dict)} tickers")
-    model.learn(total_timesteps=total_timesteps, callback=callbacks, progress_bar=True)
+    logger.info(
+        f"PPO training: {total_timesteps:,} timesteps · {len(train_dict)}"
+        " tickers"
+    )
+    model.learn(
+        total_timesteps=total_timesteps, callback=callbacks, progress_bar=True
+    )
 
     # Save
     save_path = os.path.join(MODEL_DIR, "ppo_agent")
@@ -162,14 +193,20 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
     print("\n" + "=" * 60)
     print("  PPO Validation Results")
     print("=" * 60)
-    print(f"  Mean Sharpe      : {metrics['mean_sharpe']:.3f}  (exit criterion: > 1.0)")
-    print(f"  Worst Drawdown   : {metrics['worst_drawdown']:.1%}  (exit criterion: < 20%)")
+    print(
+        f"  Mean Sharpe      : {metrics['mean_sharpe']:.3f}  (exit criterion:"
+        " > 1.0)"
+    )
+    print(
+        f"  Worst Drawdown   : {metrics['worst_drawdown']:.1%}  (exit"
+        " criterion: < 20%)"
+    )
     print(f"  Mean Ep. Return  : {metrics['mean_return']:+.2%}")
     print(f"  Episodes run     : {metrics['n_episodes']}")
     print()
 
     sharpe_ok = metrics["mean_sharpe"] > 1.0
-    dd_ok     = metrics["worst_drawdown"] < 0.20
+    dd_ok = metrics["worst_drawdown"] < 0.20
     if sharpe_ok and dd_ok:
         print("  ✓ EXIT CRITERION MET — model ready for paper trading")
     else:
@@ -187,5 +224,6 @@ def train_rl(features: pd.DataFrame, total_timesteps: int = PPO_TOTAL_TIMESTEPS)
 
 if __name__ == "__main__":
     from data.feature_engineering import build_features
+
     features = build_features()
     train_rl(features)

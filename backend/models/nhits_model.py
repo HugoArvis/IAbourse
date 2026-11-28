@@ -1,15 +1,27 @@
-import os
 import glob
+import os
 import shutil
-import torch
+
 import pandas as pd
+import torch
 from loguru import logger
-from config import MODEL_DIR, TFT_HIDDEN_SIZE, TFT_MAX_EPOCHS, TFT_BATCH_SIZE, TFT_WEIGHT_DECAY, CLASS_WEIGHTS
+
+from config import (
+    CLASS_WEIGHTS,
+    MODEL_DIR,
+    TFT_BATCH_SIZE,
+    TFT_HIDDEN_SIZE,
+    TFT_MAX_EPOCHS,
+    TFT_WEIGHT_DECAY,
+)
 from models.tft_model import WeightedCrossEntropy
 
 
 class NHiTSModel:
-    """N-HiTS wrapper — same interface as TFTModel for drop-in comparison."""
+    """N-HiTS wrapper with the same interface as TFTModel.
+
+    Drop-in replacement for comparison.
+    """
 
     def __init__(self, model=None):
         self._model = model
@@ -38,13 +50,17 @@ class NHiTSModel:
         if fold_ckpts:
             best = max(fold_ckpts, key=os.path.getmtime)
             shutil.copy2(best, path)
-            logger.info(f"N-HiTS saved to {path} (from {os.path.basename(best)})")
+            logger.info(
+                f"N-HiTS saved to {path} (from {os.path.basename(best)})"
+            )
 
     @classmethod
     def load_latest(cls) -> "NHiTSModel | None":
         from pytorch_forecasting import NHiTS
 
-        fold_ckpts = sorted(glob.glob(os.path.join(MODEL_DIR, "nhits_fold*.ckpt")))
+        fold_ckpts = sorted(
+            glob.glob(os.path.join(MODEL_DIR, "nhits_fold*.ckpt"))
+        )
         ensemble = []
         for ckpt in fold_ckpts:
             try:
@@ -70,12 +86,15 @@ class NHiTSModel:
             logger.error(f"Failed to load N-HiTS: {e}")
             return None
 
-    def predict_latest(self, features: pd.DataFrame) -> tuple[float, float, float]:
+    def predict_latest(
+        self, features: pd.DataFrame
+    ) -> tuple[float, float, float]:
         if self._model is None:
             return 0.333, 0.334, 0.333
         models = self._ensemble if self._ensemble else [self._model]
         try:
             from training.dataset import build_inference_dataloader
+
             dl = build_inference_dataloader(features)
             all_probs = []
             with torch.no_grad():

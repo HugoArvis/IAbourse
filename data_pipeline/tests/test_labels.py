@@ -34,14 +34,22 @@ def company(cid, growth=0.01, split_day=None, nan_ret_day=None, keep=None):
         ret[split_day] = growth  # total return is unaffected by the split
     if nan_ret_day is not None:
         ret[nan_ret_day] = np.nan
-    df = pd.DataFrame({"date": DAYS, "company_id": cid, "open": open_,
-                       "close": close, "ret": ret})
+    df = pd.DataFrame(
+        {
+            "date": DAYS,
+            "company_id": cid,
+            "open": open_,
+            "close": close,
+            "ret": ret,
+        }
+    )
     return df.iloc[keep] if keep is not None else df
 
 
 def members(*cids, start=DAYS[0]):
-    return pd.DataFrame({"company_id": list(cids), "start": start,
-                         "end": pd.NaT})
+    return pd.DataFrame(
+        {"company_id": list(cids), "start": start, "end": pd.NaT}
+    )
 
 
 def row(out, cid, t):
@@ -57,9 +65,9 @@ def test_open_to_open_and_split():
     panel = pd.concat([company("A"), company("B", split_day=10)])
     out = build(panel, members("A", "B"))
     for t in (0, 5, 8, 12):
-        assert np.isclose(label(out, "A", t, 5), 1.01 ** 5 - 1, atol=TOL)
-        assert np.isclose(label(out, "B", t, 5), 1.01 ** 5 - 1, atol=TOL)
-    assert np.isclose(label(out, "A", 3, 21), 1.01 ** 21 - 1, atol=TOL)
+        assert np.isclose(label(out, "A", t, 5), 1.01**5 - 1, atol=TOL)
+        assert np.isclose(label(out, "B", t, 5), 1.01**5 - 1, atol=TOL)
+    assert np.isclose(label(out, "A", 3, 21), 1.01**21 - 1, atol=TOL)
 
 
 def test_end_of_calendar_has_no_label():
@@ -93,7 +101,7 @@ def test_needs_price_on_next_day_and_membership():
     panel = pd.concat([company("A"), e])
     out = build(panel, members("A", "E", start=DAYS[3]))
     assert np.isnan(label(out, "E", 14, 5))  # no price on t+1
-    assert label(out, "E", 2, 5) is None     # not a member yet
+    assert label(out, "E", 2, 5) is None  # not a member yet
     assert not np.isnan(label(out, "E", 3, 5))
 
 

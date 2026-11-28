@@ -1,4 +1,5 @@
 import numpy as np
+
 from config import DRAWDOWN_PENALTY_THRESHOLD
 
 
@@ -9,8 +10,8 @@ def compute_reward(
     is_terminal: bool = False,
 ) -> float:
     """
-    r = sharpe_incremental - 2.0 * drawdown_penalty - 0.5 * transaction_cost
-    terminal bonus = sharpe_ratio_episode * 10
+    r = sharpe_incremental - 2.0 * drawdown_penalty - 0.5 *
+    transaction_cost terminal bonus = sharpe_ratio_episode * 10
     """
     sharpe_inc = _sharpe_incremental(returns_history)
     drawdown_penalty = max(0.0, current_drawdown - DRAWDOWN_PENALTY_THRESHOLD)
@@ -30,7 +31,8 @@ def _sharpe_incremental(returns: list[float], window: int = 20) -> float:
         return 0.0
     window_returns = returns[-window:]
     mu = np.mean(window_returns)
-    sigma = np.std(window_returns) + 1e-8  # epsilon avoids division by zero on first days
+    # epsilon avoids division by zero on first days
+    sigma = np.std(window_returns) + 1e-8
     return float(mu / sigma)
 
 

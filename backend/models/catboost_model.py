@@ -1,24 +1,36 @@
-import os
 import json
+import os
+
 import numpy as np
 import pandas as pd
 from loguru import logger
-from config import MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE, CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
+
+from config import (
+    CRISIS_PERIODS,
+    CRISIS_SAMPLE_WEIGHT,
+    MODEL_DIR,
+    TEMPORAL_WEIGHT_HALF_LIFE,
+)
+from data.feature_engineering import CATEGORICAL_FEATURES, FEATURE_COLUMNS
 
 _HORIZON_MAP = {
-    "5d":  ("relative_return",     "catboost_5d.cbm"),
+    "5d": ("relative_return", "catboost_5d.cbm"),
     "21d": ("relative_return_21d", "catboost_21d.cbm"),
 }
 
-_CAT_INDICES = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_FEATURES if c in FEATURE_COLUMNS]
+_CAT_INDICES = [
+    FEATURE_COLUMNS.index(c)
+    for c in CATEGORICAL_FEATURES
+    if c in FEATURE_COLUMNS
+]
 
 
 class CatBoostModel:
     """
     CatBoost regressor predicting forward relative return vs SP500.
     Same predict_latest() / evaluate() interface as LGBMModel.
-    Positive output = expected outperformance, negative = underperformance.
+    Positive output = expected outperformance, negative =
+    underperformance.
     """
 
     def __init__(self, model=None, horizon: str = "5d"):
@@ -48,7 +60,9 @@ class CatBoostModel:
         try:
             from catboost import CatBoostRegressor
         except ImportError:
-            raise RuntimeError("catboost not installed — run: pip install catboost")
+            raise RuntimeError(
+                "catboost not installed — run: pip install catboost"
+            )
         base = dict(
             iterations=800,
             learning_rate=0.03,
@@ -63,11 +77,15 @@ class CatBoostModel:
         return CatBoostRegressor(**base)
 
     @classmethod
-    def train(cls, features: pd.DataFrame, horizon: str = "5d") -> "CatBoostModel":
+    def train(
+        cls, features: pd.DataFrame, horizon: str = "5d"
+    ) -> "CatBoostModel":
         try:
             from catboost import Pool
         except ImportError:
-            raise RuntimeError("catboost not installed — run: pip install catboost")
+            raise RuntimeError(
+                "catboost not installed — run: pip install catboost"
+            )
 
         target_col = _HORIZON_MAP[horizon][0]
         df = features.copy().dropna(subset=[target_col])
@@ -134,7 +152,7 @@ class CatBoostModel:
             return None
 
     def predict_latest(self, features: pd.DataFrame) -> float:
-        """Return predicted forward relative return for the most recent row."""
+        """Predicted forward relative return of the most recent row."""
         if self._model is None:
             return 0.0
         try:
@@ -145,27 +163,31 @@ class CatBoostModel:
             return 0.0
 
     def evaluate(self, features: pd.DataFrame) -> dict:
-        """Direction accuracy, Spearman IC, MAE and RMSE on a provided DataFrame."""
+        """Direction accuracy, IC, MAE and RMSE on a DataFrame.
+
+        IC = Spearman rank correlation.
+        """
         if self._model is None:
             return {}
         try:
-            from sklearn.metrics import mean_absolute_error
             from scipy import stats
+            from sklearn.metrics import mean_absolute_error
+
             df = features.dropna(subset=[self._target_col])
             X = df[FEATURE_COLUMNS].fillna(0)
             y_true = df[self._target_col].astype(np.float32).values
             y_pred = self._model.predict(X).astype(np.float32)
 
             dir_acc = float((np.sign(y_pred) == np.sign(y_true)).mean())
-            ic, _   = stats.spearmanr(y_pred, y_true)
-            mae     = float(mean_absolute_error(y_true, y_pred))
-            rmse    = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+            ic, _ = stats.spearmanr(y_pred, y_true)
+            mae = float(mean_absolute_error(y_true, y_pred))
+            rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
             return {
                 "direction_accuracy": dir_acc,
-                "spearman_ic":        float(ic) if not np.isnan(ic) else 0.0,
-                "mae":                mae,
-                "rmse":               rmse,
+                "spearman_ic": float(ic) if not np.isnan(ic) else 0.0,
+                "mae": mae,
+                "rmse": rmse,
             }
         except Exception as e:
             logger.error(f"CatBoost [{self._horizon}] evaluation failed: {e}")

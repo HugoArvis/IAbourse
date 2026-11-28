@@ -1,15 +1,22 @@
-import os
 import json
+import os
 import pickle
+
 import numpy as np
 import pandas as pd
 from loguru import logger
-from config import MODEL_DIR, TEMPORAL_WEIGHT_HALF_LIFE, CRISIS_PERIODS, CRISIS_SAMPLE_WEIGHT
-from data.feature_engineering import FEATURE_COLUMNS, CATEGORICAL_FEATURES
+
+from config import (
+    CRISIS_PERIODS,
+    CRISIS_SAMPLE_WEIGHT,
+    MODEL_DIR,
+    TEMPORAL_WEIGHT_HALF_LIFE,
+)
+from data.feature_engineering import CATEGORICAL_FEATURES, FEATURE_COLUMNS
 
 # Maps horizon → (regression target column, checkpoint filename)
 _HORIZON_MAP = {
-    "5d":  ("relative_return",     "lgbm_5d.pkl"),
+    "5d": ("relative_return", "lgbm_5d.pkl"),
     "21d": ("relative_return_21d", "lgbm_21d.pkl"),
 }
 
@@ -17,11 +24,11 @@ _HORIZON_MAP = {
 class LGBMModel:
     """
     LightGBM regressor predicting forward relative return vs SP500.
-    Positive output = stock expected to outperform SP500 over the horizon.
-    Negative output = expected underperformance.
+    Positive output = stock expected to outperform SP500 over the
+    horizon. Negative output = expected underperformance.
 
-    Position sizing is handled by strategy_scorer.py using the raw return value.
-    horizon: "5d" (weekly), "21d" (monthly, primary)
+    Position sizing is handled by strategy_scorer.py using the raw
+    return value. horizon: "5d" (weekly), "21d" (monthly, primary)
     """
 
     def __init__(self, model=None, horizon: str = "5d"):
@@ -49,6 +56,7 @@ class LGBMModel:
     @classmethod
     def _make_regressor(cls, custom_params: dict | None = None):
         import lightgbm as lgb
+
         base = dict(
             n_estimators=800,
             learning_rate=0.03,
@@ -59,8 +67,8 @@ class LGBMModel:
             colsample_bytree=0.8,
             reg_alpha=0.1,
             reg_lambda=1.0,
-            objective="huber",      # robust to outlier returns
-            alpha=1.0,              # Huber loss threshold
+            objective="huber",  # robust to outlier returns
+            alpha=1.0,  # Huber loss threshold
             random_state=42,
             n_jobs=-1,
             verbose=-1,
@@ -75,7 +83,9 @@ class LGBMModel:
         try:
             import lightgbm as lgb
         except ImportError:
-            raise RuntimeError("lightgbm not installed — run: pip install lightgbm")
+            raise RuntimeError(
+                "lightgbm not installed — run: pip install lightgbm"
+            )
 
         target_col = _HORIZON_MAP[horizon][0]
         df = features.copy().dropna(subset=[target_col])
@@ -105,7 +115,8 @@ class LGBMModel:
             logger.info(f"LightGBM [{horizon}] using tuned hyperparameters")
         model = cls._make_regressor(custom_params=best_params)
         model.fit(
-            feat_df, y,
+            feat_df,
+            y,
             sample_weight=sample_weight,
             categorical_feature=CATEGORICAL_FEATURES,
         )
@@ -137,39 +148,51 @@ class LGBMModel:
             return None
 
     def predict_latest(self, features: pd.DataFrame) -> float:
-        """Return predicted forward relative return for the most recent row.
-        Positive = expected outperformance vs SP500, negative = underperformance."""
+        """Predicted forward relative return of the most recent row.
+
+        Positive = expected outperformance vs SP500, negative =
+        underperformance.
+        """
         if self._model is None:
             return 0.0
         try:
-            row = features[FEATURE_COLUMNS].iloc[[-1]].fillna(0).astype(np.float32)
+            row = (
+                features[FEATURE_COLUMNS]
+                .iloc[[-1]]
+                .fillna(0)
+                .astype(np.float32)
+            )
             return float(self._model.predict(row)[0])
         except Exception as e:
             logger.error(f"LightGBM [{self._horizon}] prediction failed: {e}")
             return 0.0
 
     def evaluate(self, features: pd.DataFrame) -> dict:
-        """Direction accuracy, Spearman IC, MAE and RMSE on a provided DataFrame."""
+        """Direction accuracy, IC, MAE and RMSE on a DataFrame.
+
+        IC = Spearman rank correlation.
+        """
         if self._model is None:
             return {}
         try:
-            from sklearn.metrics import mean_absolute_error
             from scipy import stats
+            from sklearn.metrics import mean_absolute_error
+
             df = features.dropna(subset=[self._target_col])
             X = df[FEATURE_COLUMNS].fillna(0).astype(np.float32)
             y_true = df[self._target_col].astype(np.float32).values
             y_pred = self._model.predict(X).astype(np.float32)
 
             dir_acc = float((np.sign(y_pred) == np.sign(y_true)).mean())
-            ic, _   = stats.spearmanr(y_pred, y_true)
-            mae     = float(mean_absolute_error(y_true, y_pred))
-            rmse    = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+            ic, _ = stats.spearmanr(y_pred, y_true)
+            mae = float(mean_absolute_error(y_true, y_pred))
+            rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
             return {
                 "direction_accuracy": dir_acc,
-                "spearman_ic":        float(ic) if not np.isnan(ic) else 0.0,
-                "mae":                mae,
-                "rmse":               rmse,
+                "spearman_ic": float(ic) if not np.isnan(ic) else 0.0,
+                "mae": mae,
+                "rmse": rmse,
             }
         except Exception as e:
             logger.error(f"LightGBM [{self._horizon}] evaluation failed: {e}")

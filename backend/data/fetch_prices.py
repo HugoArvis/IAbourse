@@ -1,10 +1,18 @@
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
+import sys
+from datetime import datetime, timedelta
+
 import pandas as pd
 import yfinance as yf
 from loguru import logger
-from datetime import datetime, timedelta
-from config import TICKERS, MACRO_TICKERS, PRICE_HISTORY_YEARS, DATA_DIR
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (  # noqa: E402
+    DATA_DIR,
+    MACRO_TICKERS,
+    PRICE_HISTORY_YEARS,
+    TICKERS,
+)
 
 
 def _parquet_path(ticker: str) -> str:
@@ -20,11 +28,15 @@ def fetch_prices(ticker: str, force: bool = False) -> pd.DataFrame:
         last_date = df.index.max()
         today = pd.Timestamp.now().normalize()
         if last_date >= today - pd.Timedelta(days=2):
-            logger.debug(f"{ticker}: cache up-to-date (last={last_date.date()})")
+            logger.debug(
+                f"{ticker}: cache up-to-date (last={last_date.date()})"
+            )
             return df
         start = (last_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
         logger.info(f"{ticker}: incremental fetch from {start}")
-        new_data = yf.download(ticker, start=start, auto_adjust=True, progress=False)
+        new_data = yf.download(
+            ticker, start=start, auto_adjust=True, progress=False
+        )
         if not new_data.empty:
             if isinstance(new_data.columns, pd.MultiIndex):
                 new_data.columns = new_data.columns.get_level_values(0)
@@ -34,9 +46,13 @@ def fetch_prices(ticker: str, force: bool = False) -> pd.DataFrame:
             df.to_parquet(path)
         return df
 
-    start_date = (datetime.now() - timedelta(days=365 * PRICE_HISTORY_YEARS)).strftime("%Y-%m-%d")
+    start_date = (
+        datetime.now() - timedelta(days=365 * PRICE_HISTORY_YEARS)
+    ).strftime("%Y-%m-%d")
     logger.info(f"{ticker}: full download from {start_date}")
-    df = yf.download(ticker, start=start_date, auto_adjust=True, progress=False)
+    df = yf.download(
+        ticker, start=start_date, auto_adjust=True, progress=False
+    )
     if df.empty:
         raise ValueError(f"No price data returned for {ticker}")
     if isinstance(df.columns, pd.MultiIndex):

@@ -17,3 +17,9 @@
   for features), but only for companies that were members after 2010: membership rows before 2010 there
   are survivors only. First label build started in 2008-11. Fix: labels (and any training sample)
   start on 2010-01-04 (START constant); use pre-2010 rows as feature history only.
+
+[2026-11-28] [all *.py] [TOOLING] — PEP 8 pass on the whole project. autopep8 --aggressive on E501
+  produced unreadable and still non-compliant code: don't use it. black (79 columns, string
+  splitting) keeps the AST identical; it leaves trailing comments on long lines (move them above the
+  line first) and never rewraps docstrings/comments. An automatic docstring rewrap merged a separate
+  "Usage:" line into the previous paragraph and broke lettered lists: review rewrapped docstrings.

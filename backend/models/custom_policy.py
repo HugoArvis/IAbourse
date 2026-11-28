@@ -1,9 +1,9 @@
+import gymnasium as gym
 import torch
 import torch.nn as nn
+from loguru import logger
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-import gymnasium as gym
-from loguru import logger
 
 
 class TFTFeaturesExtractor(BaseFeaturesExtractor):
@@ -20,6 +20,7 @@ class TFTFeaturesExtractor(BaseFeaturesExtractor):
         # Try to load pretrained TFT encoder
         try:
             from models.tft_model import TFTModel
+
             tft = TFTModel.load_latest()
             if tft is not None and tft._model is not None:
                 # Freeze TFT weights
@@ -29,7 +30,9 @@ class TFTFeaturesExtractor(BaseFeaturesExtractor):
                 self._tft_encoder = encoder
                 logger.info("Pretrained TFT encoder loaded and frozen for PPO")
         except Exception as e:
-            logger.warning(f"Could not load TFT encoder: {e} — using MLP fallback")
+            logger.warning(
+                f"Could not load TFT encoder: {e} — using MLP fallback"
+            )
 
         # MLP head always present (trainable)
         self.mlp = nn.Sequential(

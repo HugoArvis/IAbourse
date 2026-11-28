@@ -44,8 +44,7 @@ PANEL_COLUMNS = ["date", "company_id", "open", "close", "ret"]
 TERCILE_EDGES = [0, 1 / 3, 2 / 3, 1]
 
 
-def member_mask(panel: pd.DataFrame,
-                membership: pd.DataFrame) -> np.ndarray:
+def member_mask(panel: pd.DataFrame, membership: pd.DataFrame) -> np.ndarray:
     """True where the company is an index member on that date.
 
     A membership spell covers start <= date < end (end NaT = still in).
@@ -69,8 +68,9 @@ def _shift_up(values: np.ndarray) -> np.ndarray:
     return np.r_[values[1:], np.nan]
 
 
-def _log_open_index(p: pd.DataFrame, same_next: np.ndarray,
-                    first: np.ndarray) -> np.ndarray:
+def _log_open_index(
+    p: pd.DataFrame, same_next: np.ndarray, first: np.ndarray
+) -> np.ndarray:
     """Log of a chained open-price index, starting at 0 per company."""
     oc = (p["open"] / p["close"]).to_numpy()
     ret = p["ret"].to_numpy()
@@ -83,8 +83,7 @@ def _log_open_index(p: pd.DataFrame, same_next: np.ndarray,
     return log_open - np.repeat(log_open[starts], sizes)
 
 
-def _tercile(ret: pd.Series,
-             dates: pd.Series) -> tuple[pd.Series, pd.Series]:
+def _tercile(ret: pd.Series, dates: pd.Series) -> tuple[pd.Series, pd.Series]:
     """Excess return over the date mean, and its tercile (0, 1, 2)."""
     excess = ret - ret.groupby(dates).transform("mean")
     pct = excess.groupby(dates).rank(pct=True)
@@ -92,22 +91,32 @@ def _tercile(ret: pd.Series,
     return excess.astype(np.float32), tercile
 
 
-def build(panel: pd.DataFrame, membership: pd.DataFrame,
-          horizons=HORIZONS, start=START) -> pd.DataFrame:
+def build(
+    panel: pd.DataFrame,
+    membership: pd.DataFrame,
+    horizons=HORIZONS,
+    start=START,
+) -> pd.DataFrame:
     """One row per member-day from `start`, with labels per horizon."""
-    p = (panel[PANEL_COLUMNS].sort_values(["company_id", "date"])
-         .reset_index(drop=True))
+    p = (
+        panel[PANEL_COLUMNS]
+        .sort_values(["company_id", "date"])
+        .reset_index(drop=True)
+    )
     n = len(p)
     days = np.sort(p["date"].unique())
     day = np.searchsorted(days, p["date"].to_numpy())
-    comp = (p["company_id"].astype("category").cat.codes
-            .to_numpy().astype(np.int64))
+    comp = (
+        p["company_id"]
+        .astype("category")
+        .cat.codes.to_numpy()
+        .astype(np.int64)
+    )
     row_key = comp * (len(days) + 1) + day  # sorted, unique
     same_next = np.r_[comp[1:] == comp[:-1], False]
     first = np.r_[True, comp[1:] != comp[:-1]]
     starts = np.flatnonzero(first)
-    last_row = np.repeat(np.r_[starts[1:], n] - 1,
-                         np.diff(np.r_[starts, n]))
+    last_row = np.repeat(np.r_[starts[1:], n] - 1, np.diff(np.r_[starts, n]))
 
     log_open = _log_open_index(p, same_next, first)
     oc = (p["open"] / p["close"]).to_numpy()
@@ -131,39 +140,50 @@ def build(panel: pd.DataFrame, membership: pd.DataFrame,
         reached = (comp[end_row] == comp) & (row_key[end_row] >= target_key)
         end_row = np.where(reached, end_row, last_row)
         end_value = np.where(reached, log_open[end_row], log_close[end_row])
-        ok = (keep & has_start & in_calendar
-              & (corp_actions[end_row] == corp_actions[start_row]))
+        ok = (
+            keep
+            & has_start
+            & in_calendar
+            & (corp_actions[end_row] == corp_actions[start_row])
+        )
         ret = np.exp(end_value - log_open[start_row]) - 1
 
         out[f"ret_{h}"] = np.where(ok, ret, np.nan).astype(np.float32)
         out[f"trunc_{h}"] = ok & ~reached
-        suspect |= ok & (open_is_close[start_row]
-                         | (open_is_close[end_row] & reached))
+        suspect |= ok & (
+            open_is_close[start_row] | (open_is_close[end_row] & reached)
+        )
         labelled = out.loc[ok]
-        out[f"ex_{h}"], out[f"y_{h}"] = _tercile(labelled[f"ret_{h}"],
-                                                 labelled["date"])
+        out[f"ex_{h}"], out[f"y_{h}"] = _tercile(
+            labelled[f"ret_{h}"], labelled["date"]
+        )
     out["suspect_open"] = suspect
     return out[keep].reset_index(drop=True)
 
 
 def main():
-    panel = pd.read_parquet(CACHE / "price_panel.parquet",
-                            columns=PANEL_COLUMNS)
+    panel = pd.read_parquet(
+        CACHE / "price_panel.parquet", columns=PANEL_COLUMNS
+    )
     membership = pd.read_parquet(CACHE / "sp500_membership.parquet")
     labels = build(panel, membership)
     labels.to_parquet(CACHE / "labels.parquet")
 
     first_day = labels["date"].min().date()
     last_day = labels["date"].max().date()
-    print(f"{len(labels):,} member-days, "
-          f"{labels['company_id'].nunique()} companies, "
-          f"{first_day} -> {last_day}")
+    print(
+        f"{len(labels):,} member-days, "
+        f"{labels['company_id'].nunique()} companies, "
+        f"{first_day} -> {last_day}"
+    )
     for h in HORIZONS:
         y = labels[f"y_{h}"]
         shares = y.value_counts(normalize=True).sort_index().round(3)
-        print(f"h={h:>2}: labelled {y.notna().mean():.2%}, "
-              f"truncated {labels[f'trunc_{h}'].sum()}, "
-              f"classes {shares.to_dict()}")
+        print(
+            f"h={h:>2}: labelled {y.notna().mean():.2%}, "
+            f"truncated {labels[f'trunc_{h}'].sum()}, "
+            f"classes {shares.to_dict()}"
+        )
     print(f"suspect_open: {labels['suspect_open'].mean():.2%}")
 
 
