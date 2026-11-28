@@ -363,7 +363,8 @@ async def websocket_live(websocket: WebSocket):
         ws_manager.disconnect(websocket)
 
 
-# ── Static files — MUST be mounted last so WebSocket + API routes take precedence ───
+# ── Static files ──────────────────────────────────────────────────────
+# MUST be mounted last so WebSocket + API routes take precedence.
 _DIST = os.path.join(_HERE, "..", "frontend", "dist")
 if os.path.isdir(_DIST):
     app.mount("/", StaticFiles(directory=_DIST, html=True), name="static")

@@ -39,8 +39,8 @@ def build_timeseries_dataset(
         df["ticker"].astype(str) if "ticker" in df.columns else "default"
     )
 
-    # Integer labels 0/1/2 → NaNLabelEncoder tells pytorch-forecasting this is classification
-    # NaNLabelEncoder needs strings
+    # Integer labels 0/1/2 → NaNLabelEncoder tells pytorch-forecasting
+    # this is classification. NaNLabelEncoder needs strings.
     df["label"] = df["label"].astype(int).astype(str)
 
     feat_cols = [

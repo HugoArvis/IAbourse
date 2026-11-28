@@ -6,7 +6,7 @@ Sources: yfinance (no strict quota, few delisted tickers) and Tiingo
 (more delisted tickers, free quota ~50 requests/hour). Both are stored
 with the same schema:
   open, high, low, close   split-adjusted, NOT dividend-adjusted
-  adj_close                split- and dividend-adjusted (total return series)
+  adj_close                split- and dividend-adjusted (total return)
   volume, dividends, splits
 
 Usage: python data_pipeline/prices/download.py

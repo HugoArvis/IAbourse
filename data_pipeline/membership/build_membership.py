@@ -5,11 +5,13 @@ vanguard_500.py. Exact entry/exit dates come from the Wikipedia-derived
 sources only when they fall inside the window bracketed by two Vanguard
 snapshots; otherwise:
   - entry = first snapshot where the company is held (conservative),
-  - exit  = first snapshot where it is no longer held (keeps the decline period
-            before removal, which matters against survivorship bias).
+  - exit  = first snapshot where it is no longer held (keeps the
+            decline period before removal, which matters against
+            survivorship bias).
 
-Output: cache/sp500_membership.parquet, one row per (company, membership
-spell). Usage: python data_pipeline/membership/build_membership.py
+Output: cache/sp500_membership.parquet, one row per (company,
+membership spell).
+Usage: python data_pipeline/membership/build_membership.py
 """
 
 import sys
@@ -65,7 +67,9 @@ def load_holdings() -> pd.DataFrame:
 
 
 def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
-    """Group entities (CIKs) that are the same company; returns entity -> company_id.
+    """Group entities (CIKs) that are the same company.
+
+    Returns entity -> company_id.
     """
     uf = UnionFind()
     for e in df["entity"].unique():
@@ -87,8 +91,8 @@ def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
             uf.union(ents[0], e)
     # Rule 2: same normalized name, contiguous non-overlapping periods
     # (re-incorporations). The old entity must vanish and the new one
-    # must be new: otherwise it is an acquirer
-    # taking over the target's name (ACE -> Chubb) or a rename + spin-off (News Corp).
+    # must be new: otherwise it is an acquirer taking over the target's
+    # name (ACE -> Chubb) or a rename + spin-off (News Corp).
     span = (
         df.groupby(["key", "entity"])["date"].agg(["min", "max"]).reset_index()
     )

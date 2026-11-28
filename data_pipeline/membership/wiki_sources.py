@@ -6,7 +6,10 @@ import pandas as pd
 
 RAW = Path(__file__).resolve().parents[1] / "cache" / "raw"
 HANSHOF_CSV = RAW / "sp_500_historical_components.csv"
-HANSHOF_URL = "https://raw.githubusercontent.com/hanshof/sp500_constituents/main/sp_500_historical_components.csv"
+HANSHOF_URL = (
+    "https://raw.githubusercontent.com/hanshof/sp500_constituents/main/"
+    "sp_500_historical_components.csv"
+)
 
 
 def load_hanshof() -> pd.Series:

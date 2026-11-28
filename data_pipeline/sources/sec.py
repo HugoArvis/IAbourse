@@ -67,9 +67,8 @@ def filings(cik: int) -> pd.DataFrame:
 
 
 def archive_url(cik: int, accession: str, document: str) -> str:
-    return (
-        f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession.replace('-', '')}/{document}"
-    )
+    folder = accession.replace("-", "")
+    return f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/{document}"
 
 
 def trading_symbols(cik: int, max_filings: int = 6) -> set[str]:

@@ -301,8 +301,7 @@ class AlpacaConnector:
         return 0.0
 
     def run_inference_and_trade(self, features) -> dict:
-        """Score all equity tickers, buy top N, close stale positions.
-        """
+        """Score tickers, buy the top N, close stale positions."""
         logger.info("Running multi-ticker inference pipeline...")
         try:
             from models.rl_scorer import RLScorer
@@ -317,10 +316,9 @@ class AlpacaConnector:
                 logger.warning("No trained models found — skipping inference")
                 return {}
 
+            mode = "RL+supervised" if scorer.rl_active else "supervised-only"
             logger.info(
-                "Using"
-                f" {'RL+supervised' if scorer.rl_active else 'supervised-only'}"
-                f" scorer on {len(EQUITY_TICKERS)} tickers"
+                f"Using {mode} scorer on {len(EQUITY_TICKERS)} tickers"
             )
 
             risk = RiskManager()

@@ -1,9 +1,9 @@
 """Map company names to SEC CIK (stable company identifier).
 
-Steps: normalise names -> exact lookup in SEC cik-lookup-data (current and former
-names) -> fuzzy fallback. When several CIKs share a name, keep the one that files
-annual reports (10-K / 20-F / 40-F), i.e. the operating company, not a
-trust or a debt vehicle with a similar name.
+Steps: normalise names -> exact lookup in SEC cik-lookup-data (current
+and former names) -> fuzzy fallback. When several CIKs share a name,
+keep the one that files annual reports (10-K / 20-F / 40-F), i.e. the
+operating company, not a trust or a debt vehicle with a similar name.
 """
 
 import json
@@ -21,10 +21,14 @@ CIK_LOOKUP = RAW / "cik-lookup-data.txt"
 ANNUAL_FORMS = {"10-K", "10-K405", "10-KSB", "20-F", "40-F"}
 
 _SUFFIXES = (
-    r"\b(THE|INCORPORATED|INC|CORPORATION|CORP|COMPANY|COMPANIES|COS|CO|LTD|LIMITED|PLC|"
-    r"NV|N V|SA|AG|LP|L P|LLC|REIT|NEW|DEL|DE|MD|NY|PA|OH)\b"
+    r"\b(THE|INCORPORATED|INC|CORPORATION|CORP|COMPANY|COMPANIES|COS|CO|"
+    r"LTD|LIMITED|PLC|NV|N V|SA|AG|LP|L P|LLC|REIT|NEW|DEL|DE|MD|NY|"
+    r"PA|OH)\b"
 )
-_SHARE_CLASS = r"\b(CLASS|CL|SERIES|SER)\s+[A-Z]\b|\bSHARES?\b|\bCOMMON\b|\bSTOCK\b|\bADR\b|\bORD\b"
+_SHARE_CLASS = (
+    r"\b(CLASS|CL|SERIES|SER)\s+[A-Z]\b|\bSHARES?\b|\bCOMMON\b|\bSTOCK\b"
+    r"|\bADR\b|\bORD\b"
+)
 
 
 # Common names that differ from the legal name filed with the SEC.
@@ -45,7 +49,8 @@ def normalize(name: str) -> str:
     s = re.sub(r"[^A-Z0-9 ]", " ", s)
     s = re.sub(_SUFFIXES, " ", s)
     s = re.sub(r"\s+", " ", s).strip()
-    # Join runs of initials: "D R HORTON" and "DR HORTON" -> "DR HORTON".
+    # Join runs of initials, so that "D R HORTON" and "DR HORTON" both
+    # become "DR HORTON".
     s = re.sub(r"\b([A-Z])\s(?=[A-Z]\b)", r"\1", s)
     return ALIASES.get(s, s)
 

@@ -43,8 +43,7 @@ class RiskManager:
     def check_global_stop_loss(
         self, current_value: float, start_value: float
     ) -> bool:
-        """Return True if global stop-loss triggered (drawdown > 20%).
-        """
+        """True if the global stop-loss triggered (drawdown > 20%)."""
         if start_value <= 0:
             return False
         drawdown = (start_value - current_value) / start_value

@@ -79,10 +79,10 @@ def _train_fold(df: pd.DataFrame, horizon: str):
 
 
 def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
-    """
-    SELL recall during crash windows  — did the model warn before/during crashes?
-    BUY recall during recovery windows — did the model catch the
-    rebounds?
+    """Recall of SELL in crash windows and of BUY in recovery windows.
+
+    SELL recall: did the model warn before/during crashes?
+    BUY recall: did the model catch the rebounds?
     """
     from sklearn.metrics import recall_score
 
@@ -228,8 +228,10 @@ def walk_forward_evaluate(
 
     # Exit criterion: directional signals must be meaningfully better
     # than random
-    #     active_precision ≥ 0.40  — SELL/BUY calls correct >40% of the time (random baseline ~33%)
-    #     macro_f1         ≥ 0.35  — balanced performance across all three classes
+    #     active_precision ≥ 0.40  — SELL/BUY calls correct >40% of
+    #                                the time (random baseline ~33%)
+    #     macro_f1         ≥ 0.35  — balanced performance across all
+    #                                three classes
     #     kappa            ≥ 0.10  — non-trivial agreement beyond chance
     passed = active_precision >= 0.40 and macro_f1 >= 0.35 and kappa >= 0.10
 
@@ -420,7 +422,8 @@ if __name__ == "__main__":
         and results_21d.get("exit_criterion_met", False)
         and (crisis.get("passed") or crisis.get("skipped"))
     )
-    print(
-        "═══ Overall:"
-        f" {'READY FOR PHASE 2 ✓' if all_pass else 'NOT READY — address FAILs above'} ═══"
-    )
+    if all_pass:
+        verdict = "READY FOR PHASE 2 ✓"
+    else:
+        verdict = "NOT READY — address FAILs above"
+    print(f"═══ Overall: {verdict} ═══")

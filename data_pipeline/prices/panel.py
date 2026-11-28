@@ -2,12 +2,13 @@
 
 Each company's history is a sequence of runs (ticker, source, first_ok,
 last_ok) from validate.py. Each panel row carries a status:
-  validated  between two consecutive Vanguard snapshots where the ticker's price
-             matched the actual price;
-  extended   same series continued beyond a run, where Vanguard cannot check it:
-             before the first / after the last held snapshot (history
-             before index entry, days around exit), or up to a
-             neighbouring snapshot where the series simply has no quote.
+  validated  between two consecutive Vanguard snapshots where the
+             ticker's price matched the actual price;
+  extended   same series continued beyond a run, where Vanguard cannot
+             check it: before the first / after the last held snapshot
+             (history before index entry, days around exit), or up to
+             a neighbouring snapshot where the series simply has no
+             quote.
              Never across a snapshot where the price was present but
              wrong (the series then belongs to another company).
 Extensions stop at the first hole in the quotes (> MAX_GAP_DAYS) or

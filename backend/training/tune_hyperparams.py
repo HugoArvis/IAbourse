@@ -1,8 +1,8 @@
-"""
-Hyperparameter tuning with Optuna.
-Uses a 60/20/20 temporal split: train → val (Optuna objective) → test (final report).
-Best params saved as JSON in MODEL_DIR and auto-loaded by LGBMModel /
-CatBoostModel.
+"""Hyperparameter tuning with Optuna.
+
+Uses a 60/20/20 temporal split: train → val (Optuna objective) → test
+(final report). Best params saved as JSON in MODEL_DIR and auto-loaded
+by LGBMModel / CatBoostModel.
 
 Usage:
     py training/tune_hyperparams.py
@@ -50,8 +50,7 @@ def three_way_split(
 
 
 def _compute_weights(df: pd.DataFrame) -> np.ndarray:
-    """Same temporal decay + crisis oversampling used in model.train().
-    """
+    """Temporal decay + crisis oversampling, as in model.train()."""
     weights = np.ones(len(df), dtype=np.float32)
     if TEMPORAL_WEIGHT_HALF_LIFE is not None:
         dates = pd.to_datetime(df.index).to_series()

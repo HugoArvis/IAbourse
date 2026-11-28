@@ -6,9 +6,9 @@ an official, independent snapshot of index membership (and weights).
   - N-Q (2004-2018): HTML schedule of investments, names only.
   - NPORT-P (2019+): structured XML with CUSIP / ISIN / LEI.
 
-Outputs: cache/vanguard500_snapshots.parquet (one row per date and
-holding),
-         cache/vanguard500_name_cik.parquet  (holding name -> CIK)
+Outputs:
+  cache/vanguard500_snapshots.parquet  one row per date and holding
+  cache/vanguard500_name_cik.parquet   holding name -> CIK
 Usage: python data_pipeline/membership/vanguard_500.py
 """
 
@@ -143,7 +143,8 @@ def _series_accessions(series_id: str, form: str) -> list[str]:
     """Accession numbers of a fund series' filings (EDGAR atom feed)."""
     url = (
         "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"
-        f"&CIK={series_id}&type={form}&dateb=&owner=include&count=100&output=atom"
+        f"&CIK={series_id}&type={form}&dateb=&owner=include"
+        "&count=100&output=atom"
     )
     return re.findall(r"<accession-number>([\d-]+)<", sec.get(url))
 

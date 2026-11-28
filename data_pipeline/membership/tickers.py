@@ -3,13 +3,14 @@
 Layers, most reliable first:
   1. SEC company_tickers.json: official mapping for currently listed
      tickers.
-  2. index-constitution former members: name -> CIK within their membership period.
+  2. index-constitution former members: name -> CIK within their
+     membership period.
   3. Remaining historical tickers (hanshof): company names from the
-     Wikipedia changes
-     table and from Tiingo metadata (both tried), then name -> CIK within the period the ticker
-     was in the index. Tiingo names the *current* holder of a reused
-     ticker; the period constraint rejects those (the CIK must file
-     annual reports at the time).
+     Wikipedia changes table and from Tiingo metadata (both tried),
+     then name -> CIK within the period the ticker was in the index.
+     Tiingo names the *current* holder of a reused ticker; the period
+     constraint rejects those (the CIK must file annual reports at the
+     time).
 """
 
 import json
@@ -38,8 +39,7 @@ def sec_current_tickers() -> dict[str, int]:
 
 
 def ic_with_cik() -> pd.DataFrame:
-    """index-constitution history with a CIK per row (layers 1 and 2).
-    """
+    """index-constitution history with a CIK per row (layers 1, 2)."""
     hist = ic.history("sp500").copy()
     current = sec_current_tickers()
     active = hist["opt-out"].isna()
@@ -64,7 +64,9 @@ def ic_with_cik() -> pd.DataFrame:
 
 
 def wikipedia_change_names() -> dict[str, str]:
-    """Ticker -> security name from Wikipedia's 'Historical components' changes table.
+    """Ticker -> security name from the Wikipedia changes table.
+
+    It is the 'Historical components' table of the S&P 500 page.
     """
     if not WIKI_CHANGES_HTML.exists():
         return {}

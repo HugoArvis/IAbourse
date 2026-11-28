@@ -22,14 +22,16 @@ class TradingEnv(gym.Env):
     single alpha estimate. The RL agent learns WHEN and HOW MUCH to act
     on those predictions.
 
-    Action (1 dim): target position in [-1, 1] → maps to -100% to +100% of portfolio.
+    Action (1 dim): target position in [-1, 1], i.e. -100% to +100% of
+    the portfolio.
     """
 
     metadata = {"render_modes": []}
 
     def __init__(self, ticker_data: dict):
         super().__init__()
-        # ticker → DataFrame with columns: pred_5d, pred_21d, vix_z, market_drawdown, close
+        # ticker → DataFrame with columns: pred_5d, pred_21d, vix_z,
+        # market_drawdown, close
         self.ticker_data = ticker_data
         self.tickers = [
             t for t, df in ticker_data.items() if len(df) >= EPISODE_LENGTH + 5

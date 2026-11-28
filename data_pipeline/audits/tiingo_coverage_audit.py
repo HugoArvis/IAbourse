@@ -28,8 +28,7 @@ US_EXCHANGES = {
 
 
 def membership_periods() -> pd.DataFrame:
-    """One row per (source, ticker) with first and last membership date.
-    """
+    """One row per (source, ticker): first and last membership date."""
     hans = load_hanshof()
     long = hans.explode().rename("ticker").reset_index()
     h = (

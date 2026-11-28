@@ -13,11 +13,11 @@ ALPACA_BASE_URL = os.getenv(
 )
 
 # ── Trading universe ──────────────────────────────────────────────────
-# Expanded from 15 to 78 tickers: diverse sectors + market caps + sector
-# ETFs.
-# Rationale: more cross-sectional diversity → less survivorship bias, better
-# generalisation across market regimes. ETFs act as clean regime
-# anchors.
+# Expanded from 15 to 78 tickers: diverse sectors + market caps +
+# sector ETFs.
+# Rationale: more cross-sectional diversity → less survivorship bias,
+# better generalisation across market regimes. ETFs act as clean
+# regime anchors.
 TICKERS = [
     # ── Large-cap US equities (original universe) ──────────────────
     "AAPL",

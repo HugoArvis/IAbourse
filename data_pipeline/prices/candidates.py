@@ -68,10 +68,11 @@ def _fallback_candidates(
     (Allergan Inc. then Allergan plc on AGN, banks re-registered outside
     the SEC like Zions) the second one gets nothing. Two looser sources,
     both checked later by validate.py:
-      sec_xbrl     tickers the company declared in its own XBRL reports;
-      name_period  hanshof tickers listed while the company was held, whose
-                   Wikipedia / Tiingo name matches one of the company's
-                   names.
+      sec_xbrl     tickers the company declared in its own XBRL
+                   reports;
+      name_period  hanshof tickers listed while the company was held,
+                   whose Wikipedia / Tiingo name matches one of the
+                   company's names.
     """
     missing = holdings[~holdings["company_id"].isin(have)]
     rows = []

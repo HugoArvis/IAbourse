@@ -8,8 +8,9 @@ This proves both that the ticker is the right company at that time
 (reused tickers fail) and that the price data are sound.
 
 Outputs:
-  cache/price_checks.parquet    one row per (company, ticker, snapshot) check
-  cache/company_tickers.parquet validated ticker per company and period
+  cache/price_checks.parquet     one row per (company, ticker,
+                                 snapshot) check
+  cache/company_tickers.parquet  validated ticker per company and period
 Usage: python data_pipeline/prices/validate.py
 """
 

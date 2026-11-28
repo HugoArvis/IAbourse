@@ -2,3 +2,6 @@
 [tool.black]
 line-length = 79
 skip-string-normalization = true
+# Long strings are split too (still a preview feature of black).
+preview = true
+enable-unstable-feature = ["string_processing"]
