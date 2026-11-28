@@ -12,3 +12,8 @@
 [2026-11-26] [data_pipeline/membership/tickers.py] [BUG] — the Tiingo name of a historical ticker was only tried when Wikipedia had no name; Wikipedia's wording ("Interpublic Group of Companies") sometimes fails to match EDGAR, so IPG, DFS, ETFC, FDO... never got a CIK and their companies had no price.
   Fix: both names are tried (Wikipedia first). Companies still without ticker get fallbacks: tickers declared in their own XBRL reports (sec.trading_symbols) and name-matching hanshof tickers listed while they were held.
 [2026-11-26] [data_pipeline/sources/tiingo.py] [DATA] — Tiingo prices by ticker only serve the CURRENT holder of a reused ticker (STI 2018-2019 returns nothing) and sometimes a 1-row stub (WRK). Old holders of reused tickers are not recoverable from Tiingo free.
+
+[2026-11-28] [features/labels.py] [DATA] — price_panel.parquet starts 400 days before 2010 (LOOKBACK
+  for features), but only for companies that were members after 2010: membership rows before 2010 there
+  are survivors only. First label build started in 2008-11. Fix: labels (and any training sample)
+  start on 2010-01-04 (START constant); use pre-2010 rows as feature history only.
