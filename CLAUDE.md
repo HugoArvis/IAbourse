@@ -64,6 +64,12 @@ The project was restarted in November 2026 on new data foundations. The old syst
 - **Two horizons: 5 and 21 trading days.** The daily horizon is too noisy.
 - **Returns are measured open to open**: from the open of t+1 (when orders are
   executed) to the open of t+1+h, adjusted for dividends and splits.
+- Label rules (decided 2026-11-28, `data_pipeline/features/labels.py`):
+  members on t with a price on t and t+1; a series ending inside the window
+  (acquisition, bankruptcy) earns its return up to the last close, then cash at 0%;
+  windows containing a spin-off / special-dividend day get no label; labels on
+  every trading day from 2010 (the panel's pre-2010 rows only hold the history of
+  later members: biased).
 
 ### Timing convention
 - Decision on day t uses **all data up to the close of day t** (end-of-day data,
@@ -119,7 +125,6 @@ Removed from the old rules: confidence filter 0.55 (meaningless with relative
 labels), volume filter (all S&P 500 members are liquid), earnings blackout.
 
 ### Still open (decide with the owner when the step comes)
-- Delisting during the label horizon (last price, delisting return…).
 - Transaction cost assumptions for the backtest (spread + slippage per side).
 - Rebalance weekday (backtest should check that results do not depend on it).
 - Threshold and window of the relative stop.
@@ -163,6 +168,9 @@ data_pipeline/
 │   ├── fill_tiingo.py  # fill gaps from Tiingo (resumable, sleeps on quota)
 │   ├── validate.py     # unadjusted close vs Vanguard implied price (3% tolerance)
 │   └── panel.py        # -> cache/price_panel.parquet (status validated / extended)
+├── features/
+│   └── labels.py   # -> cache/labels.parquet (terciles 5d / 21d)
+├── tests/          # run each file with python (no pytest needed)
 ├── audits/         # coverage and consistency checks
 ├── cache/          # all downloads and outputs (git-ignored, never re-download)
 └── requirements.txt
@@ -172,7 +180,8 @@ notebooks/          # exploration notebooks (kernel "iabourse")
 Build order: `membership/vanguard_500.py` → `membership/build_membership.py` →
 `prices/candidates.py` → `prices/download.py` → `prices/fill_tiingo.py` →
 `prices/validate.py` → `membership/successors.py` → re-run `build_membership.py`,
-`candidates.py`, `validate.py` → `prices/panel.py`.
+`candidates.py`, `validate.py` → `prices/panel.py` →
+`features/labels.py`.
 Run as `python data_pipeline/<folder>/<script>.py` from the repo root.
 
 Price panel facts:
