@@ -1,7 +1,7 @@
-"""Check whether Tiingo has daily prices for every ticker that was ever in the S&P 500.
+"""Check that Tiingo has daily prices for every past S&P 500 ticker.
 
-Uses Tiingo's supported_tickers list (one file, no per-ticker API calls) and
-membership periods from both free membership sources.
+Uses Tiingo's supported_tickers list (one file, no per-ticker API calls)
+and membership periods from both free membership sources.
 
 Usage: python data_pipeline/audits/tiingo_coverage_audit.py
 """
@@ -28,7 +28,8 @@ US_EXCHANGES = {
 
 
 def membership_periods() -> pd.DataFrame:
-    """One row per (source, ticker) with first and last membership date."""
+    """One row per (source, ticker) with first and last membership date.
+    """
     hans = load_hanshof()
     long = hans.explode().rename("ticker").reset_index()
     h = (
@@ -57,7 +58,8 @@ def main() -> None:
         & tiingo["exchange"].isin(US_EXCHANGES)
     ]
     tiingo["ticker"] = tiingo["ticker"].str.upper()
-    # A ticker can appear several times (reused by different companies): keep widest span.
+    # A ticker can appear several times (reused by different companies):
+    # keep widest span.
     span = tiingo.groupby("ticker").agg(
         t_start=("startDate", "min"), t_end=("endDate", "max")
     )
@@ -66,7 +68,8 @@ def main() -> None:
     per["key"] = per["ticker"].str.upper().str.replace(".", "-", regex=False)
     per = per.join(span, on="key")
     per["found"] = per["t_start"].notna()
-    # Allow a few days of slack at both ends (listing date vs index inclusion).
+    # Allow a few days of slack at both ends (listing date vs index
+    # inclusion).
     slack = pd.Timedelta(days=7)
     per["full_cover"] = (
         per["found"]
@@ -112,11 +115,11 @@ def main() -> None:
 
 
 def print_coverage_by_year(span: pd.DataFrame) -> None:
-    """Share of index members with usable Tiingo prices at each year-end.
+    """Share of members with usable Tiingo prices at each year-end.
 
-    A member counts as covered at date d if Tiingo has data on d and the Tiingo
-    history starts before the member joined the index (otherwise the ticker was
-    most likely reused by another company).
+    A member counts as covered at date d if Tiingo has data on d and the
+    Tiingo history starts before the member joined the index (otherwise
+    the ticker was most likely reused by another company).
     """
     hans = load_hanshof()
     hist = ic.history("sp500")

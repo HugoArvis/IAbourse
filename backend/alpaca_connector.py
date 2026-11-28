@@ -201,7 +201,8 @@ class AlpacaConnector:
             )
             return
         try:
-            # Cancel any open orders for this ticker to avoid wash-trade rejection
+            # Cancel any open orders for this ticker to avoid wash-trade
+            # rejection
             from alpaca.trading.enums import QueryOrderStatus
             from alpaca.trading.requests import GetOrdersRequest
 
@@ -218,8 +219,9 @@ class AlpacaConnector:
                 )
 
             if side == "sell":
-                # Alpaca does not allow fractional notional short orders.
-                # Interpret "sell" as "close any existing long position".
+                # Alpaca does not allow fractional notional short
+                # orders. Interpret "sell" as "close any existing long
+                # position".
                 try:
                     self._client.close_position(ticker)
                     logger.info(f"Closed position for {ticker}")
@@ -248,7 +250,10 @@ class AlpacaConnector:
             logger.warning("[STUB] Would liquidate all positions")
 
     def _check_stop_losses(self) -> set[str]:
-        """Close any position down more than STOP_LOSS_PCT. Returns set of closed tickers."""
+        """Close any position down more than STOP_LOSS_PCT.
+
+        Returns the set of closed tickers.
+        """
         closed = set()
         if not self._client:
             return closed
@@ -268,7 +273,10 @@ class AlpacaConnector:
         return closed
 
     def _select_with_sector_constraint(self, candidates: list) -> list:
-        """Pick top MAX_OPEN_POSITIONS candidates with at most MAX_PER_SECTOR per sector."""
+        """Pick the top MAX_OPEN_POSITIONS candidates.
+
+        At most MAX_PER_SECTOR per sector.
+        """
         sector_count: dict[str, int] = {}
         selected = []
         for c in candidates:
@@ -285,7 +293,7 @@ class AlpacaConnector:
         return max(0.0, 1.0 - current_value / self._start_value)
 
     def _get_ticker_position(self, ticker: str, portfolio: dict) -> float:
-        """Returns current position as % of total portfolio value for one ticker."""
+        """Current position of one ticker, as % of portfolio value."""
         total_value = max(portfolio.get("total_value", self._start_value), 1)
         for p in portfolio.get("positions", []):
             if p.get("ticker") == ticker:
@@ -293,7 +301,8 @@ class AlpacaConnector:
         return 0.0
 
     def run_inference_and_trade(self, features) -> dict:
-        """Score all equity tickers, buy top N, close stale positions."""
+        """Score all equity tickers, buy top N, close stale positions.
+        """
         logger.info("Running multi-ticker inference pipeline...")
         try:
             from models.rl_scorer import RLScorer
@@ -319,10 +328,11 @@ class AlpacaConnector:
                 self.liquidate_all()
                 return {}
 
-            # Close positions that hit the per-position stop-loss before re-scoring
+            # Close positions that hit the per-position stop-loss before
+            # re-scoring
             closed_by_stop = self._check_stop_losses()
 
-            # ── Score every equity ticker ─────────────────────────────────────
+            # ── Score every equity ticker ─────────────────────────────
             candidates = []
             for ticker in EQUITY_TICKERS:
                 ticker_features = features[features["ticker"] == ticker]
@@ -362,7 +372,7 @@ class AlpacaConnector:
                 logger.warning("No valid signals produced")
                 return {}
 
-            # ── Pick top N long signals with sector constraint ────────────────
+            # ── Pick top N long signals with sector constraint ────────
             sorted_buys = sorted(
                 [
                     c
@@ -379,12 +389,14 @@ class AlpacaConnector:
                 p["ticker"] for p in portfolio.get("positions", [])
             }
 
-            # Close stale positions (skip those already closed by stop-loss)
+            # Close stale positions (skip those already closed by
+            # stop-loss)
             for ticker in held_tickers - selected_tickers - closed_by_stop:
                 logger.info(f"Closing stale position: {ticker}")
                 self.place_order(ticker, "sell", 0)
 
-            # Buy / rebalance: allocate portfolio evenly across MAX_OPEN_POSITIONS slots
+            # Buy / rebalance: allocate portfolio evenly across
+            # MAX_OPEN_POSITIONS slots
             per_slot = total_value / MAX_OPEN_POSITIONS
             for c in buy_candidates:
                 notional = round(abs(c["position_pct"] / 100.0) * per_slot, 2)

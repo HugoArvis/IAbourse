@@ -15,7 +15,10 @@ class RiskManager:
     def check_confidence(
         self, confidence: float, score: float, position_pct: float
     ) -> tuple[float, float]:
-        """Return (score, position_pct). Forces neutral if confidence too low."""
+        """Return (score, position_pct).
+
+        Forces neutral if confidence is too low.
+        """
         if confidence < CONFIDENCE_THRESHOLD:
             logger.warning(
                 f"Confidence {confidence:.3f} < {CONFIDENCE_THRESHOLD} —"
@@ -40,7 +43,8 @@ class RiskManager:
     def check_global_stop_loss(
         self, current_value: float, start_value: float
     ) -> bool:
-        """Return True if global stop-loss triggered (drawdown > 20%)."""
+        """Return True if global stop-loss triggered (drawdown > 20%).
+        """
         if start_value <= 0:
             return False
         drawdown = (start_value - current_value) / start_value
@@ -65,7 +69,10 @@ class RiskManager:
     def check_earnings_blackout(
         self, hours_to_earnings: float | None, ticker: str
     ) -> bool:
-        """Return True if in earnings blackout window (should freeze position)."""
+        """True if in the earnings blackout window.
+
+        The position should then be frozen.
+        """
         if (
             hours_to_earnings is not None
             and 0 < hours_to_earnings <= EARNINGS_BLACKOUT_HOURS

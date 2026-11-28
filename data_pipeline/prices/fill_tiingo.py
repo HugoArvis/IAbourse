@@ -1,10 +1,13 @@
-"""Fill price gaps from Tiingo within its free quota (~50 requests/hour). Resumable.
+"""Fill price gaps from Tiingo within its free quota (resumable).
 
-Phases (everything is cached, so the script can be stopped and restarted anytime):
-  A. prices of candidate tickers that yfinance lacks, when Tiingo lists them over
-     the period the company was in the index;
-  B. company names of historical tickers still unmapped (Tiingo metadata), then
-     rebuild the ticker candidates;
+The free quota is ~50 requests/hour.
+
+Phases (everything is cached, so the script can be stopped and
+restarted anytime):
+  A. prices of candidate tickers that yfinance lacks, when Tiingo lists
+     them over the period the company was in the index;
+  B. company names of historical tickers still unmapped (Tiingo
+     metadata), then rebuild the ticker candidates;
   C. same as A for the new candidates;
   then re-run the price validation.
 When the quota is reached the script sleeps one hour and continues.
@@ -32,7 +35,10 @@ WAIT = 3600
 
 
 def _with_quota(fn, item):
-    """Call fn(item), sleeping through Tiingo quota exhaustion and network outages."""
+    """Call fn(item), sleeping through quota limits and outages.
+
+    Handles Tiingo quota exhaustion and network outages.
+    """
     while True:
         try:
             return fn(item)
@@ -49,7 +55,10 @@ def _with_quota(fn, item):
 
 
 def tiingo_gap_tickers() -> list[str]:
-    """Candidate tickers with no yfinance data whose Tiingo listing covers the company's period."""
+    """Candidate tickers missing on yfinance but listed on Tiingo.
+
+    Only when the Tiingo listing covers the company's period.
+    """
     cand = pd.read_parquet(CACHE / "price_ticker_candidates.parquet")
     table = pd.read_parquet(CACHE / "sp500_membership.parquet")
     first_in = (

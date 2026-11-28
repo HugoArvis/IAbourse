@@ -35,7 +35,8 @@ def _load_prices(ticker: str) -> pd.DataFrame:
             f"No price data for {ticker} — run fetch_prices.py first"
         )
     df = pd.read_parquet(path)
-    # yfinance 1.x returns MultiIndex columns like ('Close', 'AAPL') — flatten to 'close'
+    # yfinance 1.x returns MultiIndex columns like ('Close', 'AAPL') —
+    # flatten to 'close'
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     df.columns = [
@@ -46,9 +47,9 @@ def _load_prices(ticker: str) -> pd.DataFrame:
 
 def _load_macro() -> pd.DataFrame:
     """
-    Load market-wide macro indicators (VIX, 10Y yield, DXY, Gold, SP500).
-    Returns a daily DataFrame aligned to trading days.
-    Falls back gracefully if files are missing — run fetch_prices.py first.
+    Load market-wide macro indicators (VIX, 10Y yield, DXY, Gold,
+    SP500). Returns a daily DataFrame aligned to trading days. Falls
+    back gracefully if files are missing — run fetch_prices.py first.
     """
     # ticker → column name mapping
     macro_map = {
@@ -98,7 +99,8 @@ def _compute_regime_features(df: pd.DataFrame) -> pd.DataFrame:
     Market-state features that tell the model WHAT REGIME it is in.
     All use only data available at time t (no look-ahead).
     """
-    # VIX stress level: z-score and ordinal bucket (0=calm,1=normal,2=elevated,3=panic)
+    # VIX stress level: z-score and ordinal bucket
+    # (0=calm,1=normal,2=elevated,3=panic)
     if "vix" in df.columns and df["vix"].notna().any():
         vix = df["vix"]
         vix_mean = vix.rolling(252, min_periods=63).mean()
@@ -113,7 +115,8 @@ def _compute_regime_features(df: pd.DataFrame) -> pd.DataFrame:
         df["vix_z"] = 0.0
         df["vix_regime"] = 1.0
 
-    # SP500 position relative to 200-day MA and depth of drawdown from 252-day high
+    # SP500 position relative to 200-day MA and depth of drawdown from
+    # 252-day high
     if "sp500" in df.columns and df["sp500"].notna().any():
         sp = df["sp500"]
         sp_200d = sp.rolling(200, min_periods=50).mean()
@@ -126,14 +129,16 @@ def _compute_regime_features(df: pd.DataFrame) -> pd.DataFrame:
             (sp - sp_high) / sp_high.replace(0, np.nan)
         ).fillna(0.0)
 
-        # 3-month SP500 momentum — positive = uptrend, negative = downtrend
+        # 3-month SP500 momentum — positive = uptrend, negative =
+        # downtrend
         df["sp500_momentum"] = sp.pct_change(63).fillna(0.0)
     else:
         df["sp500_200d_ratio"] = 0.0
         df["market_drawdown"] = 0.0
         df["sp500_momentum"] = 0.0
 
-    # Stock's own drawdown from its 252-day high (how deep in the hole is this ticker)
+    # Stock's own drawdown from its 252-day high (how deep in the hole
+    # is this ticker)
     stock_high = df["close"].rolling(252, min_periods=63).max()
     df["stock_drawdown"] = (
         (df["close"] - stock_high) / stock_high.replace(0, np.nan)
@@ -185,20 +190,23 @@ def _atr_thresholds(
     relative_return: pd.Series, atr: pd.Series
 ) -> tuple[pd.Series, pd.Series]:
     """
-    Compute buy/sell thresholds that target ~25/50/25 SELL/HOLD/BUY distribution.
-    Uses rolling 252-day percentiles of relative_return, scaled by ATR regime ratio
-    so thresholds widen in high-volatility periods and compress in low-volatility ones.
+    Compute buy/sell thresholds that target ~25/50/25 SELL/HOLD/BUY
+    distribution. Uses rolling 252-day percentiles of relative_return,
+    scaled by ATR regime ratio so thresholds widen in high-volatility
+    periods and compress in low-volatility ones.
     """
     window = 252
     min_p = 63
 
-    # Rolling 25th and 75th percentiles of relative_return (target the 25/50/25 split)
+    # Rolling 25th and 75th percentiles of relative_return (target the
+    # 25/50/25 split)
     buy_pct = relative_return.rolling(window, min_periods=min_p).quantile(0.75)
     sell_pct = relative_return.rolling(window, min_periods=min_p).quantile(
         0.25
     )
 
-    # ATR regime ratio — scale thresholds with current vs average volatility
+    # ATR regime ratio — scale thresholds with current vs average
+    # volatility
     atr_aligned = atr.reindex(relative_return.index).ffill()
     atr_mean = atr_aligned.rolling(window, min_periods=min_p).mean()
     atr_ratio = (
@@ -219,7 +227,7 @@ def _atr_thresholds(
 def _compute_labels_for_horizon(
     df: pd.DataFrame, sp500_df: pd.DataFrame, horizon: int
 ) -> np.ndarray:
-    """Return a label array (0=SELL, 1=HOLD, 2=BUY) for a given forward horizon."""
+    """Label array (0=SELL, 1=HOLD, 2=BUY) for a forward horizon."""
     ticker_fwd = df["close"].shift(-horizon) / df["close"] - 1
     if sp500_df is not None and not sp500_df.empty:
         sp500_aligned = sp500_df["close"].reindex(df.index).ffill()
@@ -241,7 +249,8 @@ def _compute_labels(df: pd.DataFrame, sp500_df: pd.DataFrame) -> pd.DataFrame:
     """
     Label each day: SELL=0, HOLD=1, BUY=2
     ATR-based dynamic thresholds targeting ~25/50/25 class balance.
-    Data leakage safe: labels derived from future prices, never used as input features.
+    Data leakage safe: labels derived from future prices, never used as
+    input features.
     """
     ticker_fwd = df["close"].shift(-PREDICTION_HORIZON) / df["close"] - 1
     if sp500_df is not None and not sp500_df.empty:
@@ -267,7 +276,8 @@ def _compute_labels(df: pd.DataFrame, sp500_df: pd.DataFrame) -> pd.DataFrame:
 
 def build_features(ticker: str | None = None) -> pd.DataFrame:
     # EQUITY_TICKERS: stocks only — ETFs excluded from label generation
-    # TICKERS: everything fetched (equities + ETFs used for cross-sectional ranks)
+    # TICKERS: everything fetched (equities + ETFs used for
+    # cross-sectional ranks)
     tickers = [ticker] if ticker else EQUITY_TICKERS
     all_frames = []
 
@@ -304,7 +314,8 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
                 df["sentiment_neg"] = 0.333
                 df["n_articles"] = 0
 
-            # Join macro features (forward-fill to handle non-overlapping market days)
+            # Join macro features (forward-fill to handle
+            # non-overlapping market days)
             if not macro.empty:
                 df = df.join(macro, how="left")
                 df[macro.columns] = df[macro.columns].ffill()
@@ -319,19 +330,22 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
                 (df.index.month % 3 == 0) & (df.index.day >= 25)
             ).astype(int)
 
-            # Lag returns — explicit temporal context for tree-based models
+            # Lag returns — explicit temporal context for tree-based
+            # models
             df["return_1d"] = df["close"].pct_change(1)
             df["return_5d"] = df["close"].pct_change(5)
             df["return_10d"] = df["close"].pct_change(10)
             df["return_21d"] = df["close"].pct_change(21)
 
             # Extended momentum factors (Jegadeesh-Titman / Fama-French)
-            # 3/6/12-month returns are among the strongest documented return predictors
+            # 3/6/12-month returns are among the strongest documented
+            # return predictors
             df["return_63d"] = df["close"].pct_change(63)
             df["return_126d"] = df["close"].pct_change(126)
             df["return_252d"] = df["close"].pct_change(252)
 
-            # Price-relative features — scale-invariant, better for trees than raw prices
+            # Price-relative features — scale-invariant, better for
+            # trees than raw prices
             df["close_sma20_ratio"] = (
                 df["close"] / df["sma_20"].replace(0, np.nan) - 1
             )
@@ -366,8 +380,9 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
         raise RuntimeError("No feature data could be built")
     combined = pd.concat(all_frames).sort_index()
 
-    # Cross-sectional return rank — where does this ticker rank among all tickers on the same day?
-    # Percentile 1.0 = top performer that day, 0.0 = worst. Strong empirical predictor (momentum factor).
+    # Cross-sectional return rank — where does this ticker rank among
+    # all tickers on the same day? Percentile 1.0 = top performer that
+    # day, 0.0 = worst. Strong empirical predictor (momentum factor).
     for col, out in [
         ("return_1d", "cs_rank_1d"),
         ("return_5d", "cs_rank_5d"),
@@ -379,7 +394,8 @@ def build_features(ticker: str | None = None) -> pd.DataFrame:
             combined.groupby(level=0)[col].rank(pct=True).fillna(0.5)
         )
 
-    # Encode ticker identity so LightGBM can learn ticker-specific patterns
+    # Encode ticker identity so LightGBM can learn ticker-specific
+    # patterns
     ticker_map = {
         t: i for i, t in enumerate(sorted(combined["ticker"].unique()))
     }
@@ -437,7 +453,8 @@ FEATURE_COLUMNS = [
     "market_drawdown",
     "stock_drawdown",
     "sp500_momentum",
-    # Cross-sectional momentum rank (percentile vs all tickers on the same day)
+    # Cross-sectional momentum rank (percentile vs all tickers on the
+    # same day)
     "cs_rank_1d",
     "cs_rank_5d",
     "cs_rank_21d",

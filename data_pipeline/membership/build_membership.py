@@ -1,14 +1,15 @@
 """Build the point-in-time S&P 500 membership table.
 
-Reference: Vanguard 500 Index Fund holdings (SEC filings), see vanguard_500.py.
-Exact entry/exit dates come from the Wikipedia-derived sources only when they
-fall inside the window bracketed by two Vanguard snapshots; otherwise:
+Reference: Vanguard 500 Index Fund holdings (SEC filings), see
+vanguard_500.py. Exact entry/exit dates come from the Wikipedia-derived
+sources only when they fall inside the window bracketed by two Vanguard
+snapshots; otherwise:
   - entry = first snapshot where the company is held (conservative),
   - exit  = first snapshot where it is no longer held (keeps the decline period
             before removal, which matters against survivorship bias).
 
-Output: cache/sp500_membership.parquet, one row per (company, membership spell).
-Usage: python data_pipeline/membership/build_membership.py
+Output: cache/sp500_membership.parquet, one row per (company, membership
+spell). Usage: python data_pipeline/membership/build_membership.py
 """
 
 import sys
@@ -53,7 +54,8 @@ def load_holdings() -> pd.DataFrame:
     ]
     df = snaps.merge(names, on="name", how="left")
     df["key"] = df["name"].map(normalize)
-    # Holdings without CIK (bank filers, tracking stocks) keep a name-based id.
+    # Holdings without CIK (bank filers, tracking stocks) keep a
+    # name-based id.
     df["entity"] = (
         df["cik"]
         .map(lambda c: f"cik:{int(c)}", na_action="ignore")
@@ -63,12 +65,13 @@ def load_holdings() -> pd.DataFrame:
 
 
 def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
-    """Group entities (CIKs) that are the same company; returns entity -> company_id."""
+    """Group entities (CIKs) that are the same company; returns entity -> company_id.
+    """
     uf = UnionFind()
     for e in df["entity"].unique():
         uf.find(e)
-    # Rule 1: same security identifier held under different entities (NPORT era).
-    # Non-US issuers have CUSIP "N/A": fall back to ISIN.
+    # Rule 1: same security identifier held under different entities
+    # (NPORT era). Non-US issuers have CUSIP "N/A": fall back to ISIN.
     valid_cusip = df["cusip"].str.fullmatch(r"[0-9A-Z]{8}[0-9]", na=False) & (
         df["cusip"] != "000000000"
     )
@@ -82,8 +85,9 @@ def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
         ents = g["entity"].unique()
         for e in ents[1:]:
             uf.union(ents[0], e)
-    # Rule 2: same normalized name, contiguous non-overlapping periods (re-incorporations).
-    # The old entity must vanish and the new one must be new: otherwise it is an acquirer
+    # Rule 2: same normalized name, contiguous non-overlapping periods
+    # (re-incorporations). The old entity must vanish and the new one
+    # must be new: otherwise it is an acquirer
     # taking over the target's name (ACE -> Chubb) or a rename + spin-off (News Corp).
     span = (
         df.groupby(["key", "entity"])["date"].agg(["min", "max"]).reset_index()
@@ -102,7 +106,8 @@ def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
             )
             if contiguous and succession:
                 uf.union(prev.entity, cur.entity)
-    # Rule 3: successor issuers proven by an 8-K12B and price continuity (successors.py).
+    # Rule 3: successor issuers proven by an 8-K12B and price continuity
+    # (successors.py).
     if use_links:
         from membership.successors import load_links
 
@@ -111,7 +116,8 @@ def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
             if pred in known and succ in known:
                 uf.union(pred, succ)
     ids = {e: uf.find(e) for e in df["entity"].unique()}
-    # Company id = most recent entity of the group (readable and stable going forward).
+    # Company id = most recent entity of the group (readable and stable
+    # going forward).
     last_seen = df.groupby("entity")["date"].max()
     groups: dict = {}
     for e, root in ids.items():
@@ -126,7 +132,10 @@ def assign_company_ids(df: pd.DataFrame, use_links: bool = True) -> pd.Series:
 
 
 def wiki_events(entity_to_company: pd.Series) -> pd.DataFrame:
-    """Candidate entry/exit dates from both Wikipedia-derived sources, per company."""
+    """Entry/exit dates per company from both Wikipedia sources.
+
+    These are candidates.
+    """
     ic_hist = ic_with_cik()
     rows = []
     known = ic_hist.dropna(subset=["cik"])
@@ -142,7 +151,8 @@ def wiki_events(entity_to_company: pd.Series) -> pd.DataFrame:
     hans = load_hanshof()
     t2c = ticker_to_cik(ic_hist, hanshof_ticker_periods(hans))
     dates = hans.index
-    # Members on hanshof's first date: member since at least that date (lower bound).
+    # Members on hanshof's first date: member since at least that date
+    # (lower bound).
     for t in hans.iloc[0]:
         cik = t2c.get(key(t))
         comp = entity_to_company.get(f"cik:{cik}") if cik else None
@@ -169,7 +179,10 @@ def build() -> pd.DataFrame:
     events = wiki_events(company)
 
     def pick(comp: str, kind: str, lo, hi):
-        """Wikipedia date in (lo, hi]; if both sources give one, prefer agreement then ic."""
+        """Wikipedia date in (lo, hi].
+
+        If both sources give one, prefer agreement, then ic.
+        """
         ev = events[
             (events["company_id"] == comp)
             & (events["kind"] == kind)
@@ -199,7 +212,8 @@ def build() -> pd.DataFrame:
             while k + 1 < len(snap_dates) and present[k + 1]:
                 k += 1
             end_k = k
-            # Entry, bracketed by previous snapshot (or open-ended before the first one).
+            # Entry, bracketed by previous snapshot (or open-ended
+            # before the first one).
             lo = (
                 snap_dates[start_k - 1]
                 if start_k > 0
@@ -210,7 +224,8 @@ def build() -> pd.DataFrame:
                 start, s_src = snap_dates[start_k], (
                     "snapshot" if start_k > 0 else "left_censored"
                 )
-            # Exit, bracketed by next snapshot (or open-ended after the last one).
+            # Exit, bracketed by next snapshot (or open-ended after the
+            # last one).
             if end_k + 1 < len(snap_dates):
                 end, e_src = pick(
                     comp, "out", snap_dates[end_k], snap_dates[end_k + 1]

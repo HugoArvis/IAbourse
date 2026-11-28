@@ -34,7 +34,7 @@ _state = {
 }
 
 
-# ── State persistence ─────────────────────────────────────────────────────────
+# ── State persistence ─────────────────────────────────────────────────
 
 
 def _save_status():
@@ -71,7 +71,7 @@ def _load_persisted_state():
             pass
 
 
-# ── Lifespan ──────────────────────────────────────────────────────────────────
+# ── Lifespan ──────────────────────────────────────────────────────────
 
 
 @asynccontextmanager
@@ -103,7 +103,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── REST endpoints ────────────────────────────────────────────────────────────
+# ── REST endpoints ────────────────────────────────────────────────────
 
 
 @app.get("/api/status")
@@ -247,7 +247,10 @@ def model_stop():
 
 @app.post("/api/model/run-now")
 async def model_run_now():
-    """Trigger inference in background — returns immediately, dashboard updates via WebSocket."""
+    """Trigger inference in the background and return immediately.
+
+    The dashboard is updated via WebSocket.
+    """
     if _state["model_status"] != "active":
         raise HTTPException(
             status_code=400, detail="Model must be started first"
@@ -301,7 +304,7 @@ async def model_kill(body: dict):
     return {"status": "killed", "message": "All positions liquidated"}
 
 
-# ── WebSocket ─────────────────────────────────────────────────────────────────
+# ── WebSocket ─────────────────────────────────────────────────────────
 
 
 def _is_market_hours() -> bool:
@@ -360,7 +363,7 @@ async def websocket_live(websocket: WebSocket):
         ws_manager.disconnect(websocket)
 
 
-# ── Static files — MUST be mounted last so WebSocket + API routes take precedence ──
+# ── Static files — MUST be mounted last so WebSocket + API routes take precedence ───
 _DIST = os.path.join(_HERE, "..", "frontend", "dist")
 if os.path.isdir(_DIST):
     app.mount("/", StaticFiles(directory=_DIST, html=True), name="static")

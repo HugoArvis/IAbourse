@@ -1,24 +1,27 @@
-"""Assemble one daily price series per company from the validated ticker periods.
+"""One daily price series per company, from validated ticker periods.
 
-Each company's history is a sequence of runs (ticker, source, first_ok, last_ok) from
-validate.py. Each panel row carries a status:
+Each company's history is a sequence of runs (ticker, source, first_ok,
+last_ok) from validate.py. Each panel row carries a status:
   validated  between two consecutive Vanguard snapshots where the ticker's price
              matched the actual price;
   extended   same series continued beyond a run, where Vanguard cannot check it:
-             before the first / after the last held snapshot (history before index
-             entry, days around exit), or up to a neighbouring snapshot where the
-             series simply has no quote. Never across a snapshot where the price
-             was present but wrong (the series then belongs to another company).
-Extensions stop at the first hole in the quotes (> MAX_GAP_DAYS) or extreme jump.
+             before the first / after the last held snapshot (history
+             before index entry, days around exit), or up to a
+             neighbouring snapshot where the series simply has no quote.
+             Never across a snapshot where the price was present but
+             wrong (the series then belongs to another company).
+Extensions stop at the first hole in the quotes (> MAX_GAP_DAYS) or
+extreme jump.
 
-Rows are kept from LOOKBACK before each membership spell (features need history
-before index entry) to FORWARD after its end (labels need future returns), from
-PANEL_START on.
+Rows are kept from LOOKBACK before each membership spell (features need
+history before index entry) to FORWARD after its end (labels need future
+returns), from PANEL_START on.
 
-`ret` is the daily total return, computed inside each source series (NaN on
-spin-off / special-dividend days, flagged `corp_action`, which free data get wrong); at a switch
-between series it is close_unadj(t) / close_unadj(t-1) - 1 (validated 1:1 shares).
-Price levels (open..close, adj_close) may jump at such switches: use `ret` to chain.
+`ret` is the daily total return, computed inside each source series (NaN
+on spin-off / special-dividend days, flagged `corp_action`, which free
+data get wrong); at a switch between series it is close_unadj(t) /
+close_unadj(t-1) - 1 (validated 1:1 shares). Price levels (open..close,
+adj_close) may jump at such switches: use `ret` to chain.
 
 Output: cache/price_panel.parquet
 Usage: python data_pipeline/prices/panel.py
@@ -57,7 +60,10 @@ COLUMNS = [
 
 
 def _windows(spells: pd.DataFrame, today: pd.Timestamp) -> list[tuple]:
-    """Merged [start - LOOKBACK, end + FORWARD] windows of a company's spells from PANEL_START."""
+    """Merged [start - LOOKBACK, end + FORWARD] windows of the spells.
+
+    Only from PANEL_START on.
+    """
     out = []
     for s in spells.sort_values("start").itertuples():
         end = s.end if pd.notna(s.end) else today
@@ -72,11 +78,15 @@ def _windows(spells: pd.DataFrame, today: pd.Timestamp) -> list[tuple]:
 
 
 def _corporate_action(px: pd.DataFrame) -> pd.Series:
-    """Days whose total return free providers get wrong: spin-offs and special dividends.
+    """Days whose total return free providers get wrong.
 
-    Yahoo encodes a spin-off as a fractional "split" (DHR 2016: 1.319, adjusted series
-    +61%), Tiingo ignores the distributed shares (CSC 2015: -39%). Plain splits with
-    simple ratios (2:1, 3:2, 1:4...) are reliable and not flagged."""
+    Spin-offs and special dividends.
+
+    Yahoo encodes a spin-off as a fractional "split" (DHR 2016: 1.319,
+    adjusted series +61%), Tiingo ignores the distributed shares (CSC
+    2015: -39%). Plain splits with simple ratios (2:1, 3:2, 1:4...) are
+    reliable and not flagged.
+    """
     r = px["splits"].where(px["splits"] > 0)
     simple = pd.Series(False, index=px.index)
     for x in (r, 1 / r):
@@ -109,7 +119,10 @@ def _series(ticker: str, source: str, cache: dict) -> pd.DataFrame:
 
 
 def _extension_limits(px: pd.DataFrame, run, prev_check, next_check) -> tuple:
-    """How far a run's series may be continued before first_ok and after last_ok."""
+    """Limits to which a run's series may be extended.
+
+    Before first_ok and after last_ok.
+    """
 
     # neighbouring held snapshot: no snapshot, no quote, or ok
     def allowed(check) -> bool:
@@ -211,7 +224,8 @@ def build() -> pd.DataFrame:
             continue
         df = pd.concat(pieces)
         df.index.name = "date"
-        # One row per day: validated beats extended, then the closest run.
+        # One row per day: validated beats extended, then the closest
+        # run.
         df = (
             df.reset_index()
             .sort_values(["date", "priority", "dist"])
@@ -224,7 +238,8 @@ def build() -> pd.DataFrame:
         df = df[inside]
         if df.empty:
             continue
-        # Total return: from the source series when its previous quote is the panel's previous row.
+        # Total return: from the source series when its previous quote
+        # is the panel's previous row.
         panel_prev = df.index.to_series().shift()
         same_series = (df["ticker"] == df["ticker"].shift()) & (
             df["source"] == df["source"].shift()
@@ -263,7 +278,10 @@ def build() -> pd.DataFrame:
 
 
 def coverage_report(panel: pd.DataFrame) -> None:
-    """Share of index member-days (from PANEL_START) with a price, by status and year."""
+    """Share of member-days with a price, by status and year.
+
+    Counted from PANEL_START.
+    """
     spells = pd.read_parquet(CACHE / "sp500_membership.parquet")
     calendar = pd.DatetimeIndex(sorted(panel["date"].unique()))
     calendar = calendar[calendar >= PANEL_START]

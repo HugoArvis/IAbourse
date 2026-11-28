@@ -1,12 +1,13 @@
-"""Point-in-time holdings of the Vanguard 500 Index Fund from SEC filings.
+"""Vanguard 500 Index Fund point-in-time holdings, from SEC filings.
 
-The fund fully replicates the S&P 500, so its common-stock holdings are an
-official, independent snapshot of index membership (and weights).
+The fund fully replicates the S&P 500, so its common-stock holdings are
+an official, independent snapshot of index membership (and weights).
 
   - N-Q (2004-2018): HTML schedule of investments, names only.
   - NPORT-P (2019+): structured XML with CUSIP / ISIN / LEI.
 
-Outputs: cache/vanguard500_snapshots.parquet (one row per date and holding),
+Outputs: cache/vanguard500_snapshots.parquet (one row per date and
+holding),
          cache/vanguard500_name_cik.parquet  (holding name -> CIK)
 Usage: python data_pipeline/membership/vanguard_500.py
 """
@@ -46,7 +47,7 @@ def _to_number(value) -> float | None:
 
 
 def _section(html: str) -> str:
-    """Slice of the document holding the 500 Index Fund schedule of investments."""
+    """Slice of the document with the fund's schedule of investments."""
     for m in FUND_HEADER.finditer(html):
         window = re.sub(
             r"<[^>]+>|&nbsp;|&#160;", " ", html[m.end() : m.end() + 4000]
@@ -62,7 +63,10 @@ def _section(html: str) -> str:
 
 
 def parse_nq(html: str) -> pd.DataFrame:
-    """Common-stock rows (name, shares, market value in $000) of the 500 Index Fund."""
+    """Common-stock rows of the 500 Index Fund.
+
+    Columns: name, shares, market value in $000.
+    """
     rows = []
     for table in pd.read_html(StringIO(_section(html))):
         for rec in table.itertuples(index=False):
@@ -71,7 +75,8 @@ def parse_nq(html: str) -> pd.DataFrame:
                 for c in rec
                 if not (isinstance(c, float) and pd.isna(c))
             ]
-            # Name = first cell with real words; footnote markers (*, ^, 1,2) may sit in their own cells.
+            # Name = first cell with real words; footnote markers (*, ^,
+            # 1,2) may sit in their own cells.
             idx = next(
                 (
                     i
@@ -92,7 +97,8 @@ def parse_nq(html: str) -> pd.DataFrame:
             ]
             if len(nums) < 2 or re.match(r"\W*(total|\(cost)", name, re.I):
                 continue
-            # Merged cells can be duplicated by read_html: shares first, market value last.
+            # Merged cells can be duplicated by read_html: shares first,
+            # market value last.
             rows.append({"name": name, "shares": nums[0], "value_k": nums[-1]})
     return _clean(rows)
 
@@ -134,7 +140,7 @@ def nq_snapshots() -> pd.DataFrame:
 
 
 def _series_accessions(series_id: str, form: str) -> list[str]:
-    """Accession numbers of one fund series' filings, via the EDGAR atom feed."""
+    """Accession numbers of a fund series' filings (EDGAR atom feed)."""
     url = (
         "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"
         f"&CIK={series_id}&type={form}&dateb=&owner=include&count=100&output=atom"
@@ -186,8 +192,11 @@ def nport_snapshots() -> pd.DataFrame:
 
 
 def snapshots(min_weight: float = 1e-5) -> pd.DataFrame:
-    """All snapshots with index weight; drops residual positions (spin-off leftovers,
-    warrants, just-removed names) whose weight is below `min_weight`."""
+    """All snapshots, with index weight.
+
+    Drops residual positions (spin-off leftovers, warrants, just-removed
+    names) whose weight is below `min_weight`.
+    """
     df = pd.concat([nq_snapshots(), nport_snapshots()], ignore_index=True)
     df = df[df["value_k"] > 0]
     df["weight"] = df["value_k"] / df.groupby("date")["value_k"].transform(

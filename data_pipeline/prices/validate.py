@@ -1,10 +1,11 @@
-"""Validate price series against Vanguard 500 holdings and pick each company's ticker.
+"""Check prices against Vanguard 500 holdings and pick the tickers.
 
-At every snapshot, Vanguard reports shares held and market value, i.e. the actual
-closing price of the stock that day (implied = value / shares). A candidate ticker
-is validated for a company at a snapshot when its unadjusted close matches the
-implied price within TOLERANCE. This proves both that the ticker is the right
-company at that time (reused tickers fail) and that the price data are sound.
+At every snapshot, Vanguard reports shares held and market value, i.e.
+the actual closing price of the stock that day (implied = value /
+shares). A candidate ticker is validated for a company at a snapshot
+when its unadjusted close matches the implied price within TOLERANCE.
+This proves both that the ticker is the right company at that time
+(reused tickers fail) and that the price data are sound.
 
 Outputs:
   cache/price_checks.parquet    one row per (company, ticker, snapshot) check
@@ -31,7 +32,10 @@ TOLERANCE = 0.03
 
 
 def unadjusted_close(px: pd.DataFrame) -> pd.Series:
-    """Undo yfinance split adjustment: raw(t) = close(t) * product of split ratios after t."""
+    """Undo yfinance split adjustment.
+
+    raw(t) = close(t) * product of split ratios after t.
+    """
     ratios = px["splits"].where(px["splits"] > 0, 1.0)
     # product of splits strictly after t
     after = ratios[::-1].cumprod()[::-1].shift(-1, fill_value=1.0)
@@ -70,7 +74,8 @@ def run() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                     )
                 raw = raw_cache[t, src]
                 if raw.empty and src != "yfinance":
-                    # absent secondary source: no row (keeps yfinance as the baseline)
+                    # absent secondary source: no row (keeps yfinance as
+                    # the baseline)
                     continue
                 for r in rows.itertuples():
                     p = price_on(raw, r.date) if not raw.empty else None
@@ -95,15 +100,19 @@ def run() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 
 def pick_periods(checks: pd.DataFrame) -> pd.DataFrame:
-    """Validated (ticker, source) per company as runs of consecutive held snapshots.
+    """Validated (ticker, source) runs per company.
 
-    Selection is by continuity, not by total count: providers sometimes splice two
-    companies under one ticker (Yahoo's AA = Alcoa Inc. until 2016, then Alcoa Corp.),
-    and an unrelated price can match within the tolerance by chance on one date.
-      - per snapshot, the candidate whose run of consecutive validations is longest wins
-        (then most validations overall, then yfinance);
-      - a single isolated validation contradicted by a neighbouring snapshot (price
-        present but different) is a coincidence and is dropped;
+    A run is a sequence of consecutive held snapshots.
+
+    Selection is by continuity, not by total count: providers sometimes
+    splice two companies under one ticker (Yahoo's AA = Alcoa Inc. until
+    2016, then Alcoa Corp.), and an unrelated price can match within the
+    tolerance by chance on one date.
+      - per snapshot, the candidate whose run of consecutive validations
+        is longest wins (then most validations overall, then yfinance);
+      - a single isolated validation contradicted by a neighbouring
+        snapshot (price present but different) is a coincidence and is
+        dropped;
       - a period never spans a snapshot where it was not picked.
     """
     keys = ["company_id", "ticker", "source"]
@@ -134,7 +143,8 @@ def pick_periods(checks: pd.DataFrame) -> pd.DataFrame:
         ["run_len", "n_ok", "src_rank"], ascending=[False, False, True]
     ).drop_duplicates(["company_id", "date"])
 
-    # Index of each held snapshot within its company, to detect breaks between picks.
+    # Index of each held snapshot within its company, to detect breaks
+    # between picks.
     held = (
         agg[["company_id", "date"]]
         .drop_duplicates()
@@ -160,7 +170,10 @@ def pick_periods(checks: pd.DataFrame) -> pd.DataFrame:
 
 
 def coverage_report(periods: pd.DataFrame, holdings: pd.DataFrame) -> None:
-    """Share of ALL index members (Vanguard holdings) with a validated price, per year."""
+    """Share of ALL index members with a validated price, per year.
+
+    Members from the Vanguard holdings.
+    """
     held = holdings.groupby(["company_id", "date"], as_index=False)[
         "weight"
     ].sum()

@@ -1,14 +1,15 @@
 """Candidate tickers for every company of the membership table.
 
-A company (company_id) can have several tickers over time (renames, reused symbols).
-Candidates come from:
+A company (company_id) can have several tickers over time (renames,
+reused symbols). Candidates come from:
   - index-constitution: canonical (latest) ticker, mapped to CIK,
   - hanshof: ticker as listed at the time, mapped to CIK,
   - SEC company_tickers.json: current ticker(s) of the CIK,
-  - for companies still without any: tickers declared in their XBRL reports, and
-    hanshof tickers whose name matches while the company was held.
-Which candidate is right for which period is decided later by validate.py, using
-Vanguard's implied share prices.
+  - for companies still without any: tickers declared in their XBRL
+    reports, and hanshof tickers whose name matches while the company
+    was held.
+Which candidate is right for which period is decided later by
+validate.py, using Vanguard's implied share prices.
 """
 
 import json
@@ -43,10 +44,12 @@ NAME_MATCH = 90  # rapidfuzz token_sort_ratio on normalized names
 
 
 def sec_primary_tickers() -> pd.DataFrame:
-    """One row per CIK: its primary ticker (first listed by the SEC) and company title.
+    """One row per CIK: primary ticker and company title.
 
-    The SEC file also lists preferreds / secondary lines under the same CIK
-    (e.g. FMCC plus FMCCG, FMCCH...): only the first entry is kept.
+    The primary ticker is the first one listed by the SEC.
+
+    The SEC file also lists preferreds / secondary lines under the same
+    CIK (e.g. FMCC plus FMCCG, FMCCH...): only the first entry is kept.
     """
     data = json.loads(
         sec.get("https://www.sec.gov/files/company_tickers.json")
@@ -59,14 +62,16 @@ def sec_primary_tickers() -> pd.DataFrame:
 def _fallback_candidates(
     holdings: pd.DataFrame, have: set, periods: pd.DataFrame
 ) -> pd.DataFrame:
-    """Candidates for companies the CIK mappings left without any ticker.
+    """Candidates for companies with no ticker from the CIK mappings.
 
-    A ticker maps to a single CIK above, so when two entities shared it (Allergan Inc.
-    then Allergan plc on AGN, banks re-registered outside the SEC like Zions) the
-    second one gets nothing. Two looser sources, both checked later by validate.py:
+    A ticker maps to a single CIK above, so when two entities shared it
+    (Allergan Inc. then Allergan plc on AGN, banks re-registered outside
+    the SEC like Zions) the second one gets nothing. Two looser sources,
+    both checked later by validate.py:
       sec_xbrl     tickers the company declared in its own XBRL reports;
       name_period  hanshof tickers listed while the company was held, whose
-                   Wikipedia / Tiingo name matches one of the company's names.
+                   Wikipedia / Tiingo name matches one of the company's
+                   names.
     """
     missing = holdings[~holdings["company_id"].isin(have)]
     rows = []
@@ -117,8 +122,9 @@ def build_candidates() -> pd.DataFrame:
     cand["company_id"] = cand["entity"].map(company)
     cand = cand.dropna(subset=["company_id"])
 
-    # Companies still without candidate: same normalized name as a current SEC listing
-    # (e.g. Exxon Mobil whose ticker now points to a new holding-company CIK).
+    # Companies still without candidate: same normalized name as a
+    # current SEC listing (e.g. Exxon Mobil whose ticker now points to a
+    # new holding-company CIK).
     holdings["company_id"] = holdings["entity"].map(company)
     missing = holdings[~holdings["company_id"].isin(cand["company_id"])]
 
@@ -160,8 +166,9 @@ def build_candidates() -> pd.DataFrame:
             _fallback_candidates(holdings, set(cand["company_id"]), periods),
         ]
     )
-    # SEC lists many secondary lines (preferreds, warrants: "BAC-PL", "XYZ.WS"): keep plain symbols
-    # plus share classes like BRK.B / BF.B.
+    # SEC lists many secondary lines (preferreds, warrants: "BAC-PL",
+    # "XYZ.WS"): keep plain symbols plus share classes like BRK.B /
+    # BF.B.
     cand = cand[cand["ticker"].str.fullmatch(r"[A-Z]{1,5}(\.[A-Z])?")]
     return (
         cand.groupby(["company_id", "ticker"])["source"]

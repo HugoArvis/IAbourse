@@ -12,10 +12,12 @@ ALPACA_BASE_URL = os.getenv(
     "ALPACA_BASE_URL", "https://paper-api.alpaca.markets"
 )
 
-# ── Trading universe ───────────────────────────────────────────────────────────
-# Expanded from 15 to 78 tickers: diverse sectors + market caps + sector ETFs.
+# ── Trading universe ──────────────────────────────────────────────────
+# Expanded from 15 to 78 tickers: diverse sectors + market caps + sector
+# ETFs.
 # Rationale: more cross-sectional diversity → less survivorship bias, better
-# generalisation across market regimes. ETFs act as clean regime anchors.
+# generalisation across market regimes. ETFs act as clean regime
+# anchors.
 TICKERS = [
     # ── Large-cap US equities (original universe) ──────────────────
     "AAPL",
@@ -108,9 +110,10 @@ TICKERS = [
     "HYG",
 ]
 
-# Tickers for which we actually generate BUY/SELL/HOLD signals — equities only.
-# ETFs are in TICKERS (fetched, used as cross-sectional features) but excluded here
-# because their low volatility skews labels toward HOLD and dilutes the training signal.
+# Tickers for which we actually generate BUY/SELL/HOLD signals —
+# equities only. ETFs are in TICKERS (fetched, used as cross-sectional
+# features) but excluded here because their low volatility skews labels
+# toward HOLD and dilutes the training signal.
 EQUITY_TICKERS = [
     t
     for t in TICKERS
@@ -208,14 +211,16 @@ STOP_LOSS_PCT = -0.08
 # Score / position formula constants
 SCORE_NEUTRAL = 5.0
 
-# Multi-horizon weights — 5d suppressed (direction accuracy ~50%, near-random)
+# Multi-horizon weights — 5d suppressed (direction accuracy ~50%,
+# near-random)
 HORIZON_WEIGHTS = {"weekly": 0.0, "monthly": 1.0}
 
 # Regression scoring: predicted alpha at which position reaches ±100%
 # e.g. 0.03 → a +3% predicted 21d alpha vs SP500 = full long position
 MAX_PREDICTED_RETURN = 0.015
 
-# Sector classification for concentration constraint (covers all 63 EQUITY_TICKERS)
+# Sector classification for concentration constraint (covers all 63
+# EQUITY_TICKERS)
 SECTOR_MAP = {
     # Technology (16)
     "AAPL": "tech",
@@ -296,8 +301,9 @@ SECTOR_MAP = {
 TEMPORAL_WEIGHT_HALF_LIFE = 252  # ~1 trading year
 
 # Rolling training window — only train on the last N years of data.
-# Older data describes market regimes that no longer apply and hurts out-of-sample
-# performance on recent data. 3 years captures 1+ full market cycle.
+# Older data describes market regimes that no longer apply and hurts
+# out-of-sample performance on recent data. 3 years captures 1+ full
+# market cycle.
 ROLLING_WINDOW_YEARS = 5
 
 # Scheduler (NY time) — daily trading decision
@@ -305,7 +311,8 @@ SCHEDULE_HOUR = 15
 SCHEDULE_MINUTE = 30
 SCHEDULE_TIMEZONE = "America/New_York"
 
-# Weekly retraining schedule (Sunday evening — before Monday market open)
+# Weekly retraining schedule (Sunday evening — before Monday market
+# open)
 RETRAIN_DAY_OF_WEEK = "sun"
 RETRAIN_HOUR = 18
 RETRAIN_MINUTE = 0

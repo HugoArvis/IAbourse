@@ -1,12 +1,14 @@
 """
-RL training — PPO fine-tuning on top of LightGBM/CatBoost base predictions.
+RL training — PPO fine-tuning on top of LightGBM/CatBoost base
+predictions.
 
 Architecture:
-  - LightGBM (21d) + CatBoost (5d) predictions are pre-computed for every
-    historical row, compressing the 60-day feature window into two floats.
-  - The PPO agent receives a compact 8-dim observation and learns WHEN and
-    HOW MUCH to act on those predictions, taking into account regime stress
-    and current portfolio state.
+  - LightGBM (21d) + CatBoost (5d) predictions are pre-computed for
+    every historical row, compressing the 60-day feature window into two
+    floats.
+  - The PPO agent receives a compact 8-dim observation and learns WHEN
+    and HOW MUCH to act on those predictions, taking into account regime
+    stress and current portfolio state.
   - Action space: target position in [-1, 1] (i.e., -100% to +100%).
 
 Exit criterion (CLAUDE.md Phase 2):
@@ -47,14 +49,14 @@ from rl.callbacks import build_callbacks  # noqa: E402
 from rl.reward_functions import _episode_sharpe  # noqa: E402
 from rl.trading_env import EPISODE_LENGTH, TradingEnv  # noqa: E402
 
-# ── Data preparation ──────────────────────────────────────────────────────────
+# ── Data preparation ──────────────────────────────────────────────────
 
 
 def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
     """
     1. 60/20/20 temporal split (train / val / test — test unused here).
-    2. Pre-compute LightGBM-21d and CatBoost-5d predictions for every row.
-       This avoids calling models inside the hot training loop.
+    2. Pre-compute LightGBM-21d and CatBoost-5d predictions for every
+       row. This avoids calling models inside the hot training loop.
     3. Return (train_dict, val_dict): ticker → DataFrame.
     """
     from models.catboost_model import CatBoostModel
@@ -100,7 +102,7 @@ def prepare_rl_data(features: pd.DataFrame) -> tuple[dict, dict]:
     return train_dict, val_dict
 
 
-# ── Evaluation ────────────────────────────────────────────────────────────────
+# ── Evaluation ────────────────────────────────────────────────────────
 
 
 def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
@@ -131,7 +133,7 @@ def evaluate_rl(model: PPO, val_dict: dict, n_episodes: int = 30) -> dict:
     }
 
 
-# ── Training ──────────────────────────────────────────────────────────────────
+# ── Training ──────────────────────────────────────────────────────────
 
 
 def train_rl(
@@ -145,8 +147,9 @@ def train_rl(
         f"  Train tickers: {len(train_dict)}  |  Val tickers: {len(val_dict)}"
     )
 
-    # DummyVecEnv: works on all platforms (SubprocVecEnv deadlocks on Windows
-    # because closure-captured DataFrames can't be pickled across spawn processes)
+    # DummyVecEnv: works on all platforms (SubprocVecEnv deadlocks on
+    # Windows because closure-captured DataFrames can't be pickled
+    # across spawn processes)
     n_envs = 4
     env = DummyVecEnv([lambda: TradingEnv(train_dict)] * n_envs)
     print(f"  Vectorized environment ready ({n_envs} envs, DummyVecEnv)")

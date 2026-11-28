@@ -1,22 +1,25 @@
-"""Link companies that changed legal entity (CIK) without changing their shares.
+"""Link companies that changed CIK without changing their shares.
 
-Example: Google Inc. (CIK 1288776) became Alphabet Inc. (CIK 1652044) in 2015 through
-a holding-company reorganization: one Google share became one Alphabet share, same
-ticker, same price. The SEC sees two issuers; economically it is one company.
+Example: Google Inc. (CIK 1288776) became Alphabet Inc. (CIK 1652044) in
+2015 through a holding-company reorganization: one Google share became
+one Alphabet share, same ticker, same price. The SEC sees two issuers;
+economically it is one company.
 
-A successor issuer announces itself with an 8-K12B / 8-K12G3 filing. Acquirers also
-file these forms when they take over a target's registered securities (Wells Fargo
-for Wachovia), so the filing alone is not enough. A pair (predecessor P, successor S)
-is linked only when:
+A successor issuer announces itself with an 8-K12B / 8-K12G3 filing.
+Acquirers also file these forms when they take over a target's
+registered securities (Wells Fargo for Wachovia), so the filing alone is
+not enough. A pair (predecessor P, successor S) is linked only when:
   1. S filed an 8-K12B / 8-K12G3;
-  2. P's last Vanguard snapshot is the last one before the filing (P vanished then);
-  3. S's share price matches P's actual price (Vanguard implied price) at P's
-     snapshots: one old share = one new share. An acquisition with any other
-     exchange ratio fails this test.
+  2. P's last Vanguard snapshot is the last one before the filing (P
+     vanished then);
+  3. S's share price matches P's actual price (Vanguard implied price)
+     at P's snapshots: one old share = one new share. An acquisition
+     with any other exchange ratio fails this test.
 
-Run after prices/validate.py inputs exist (candidates + downloaded prices); the links
-are then used by build_membership.assign_company_ids, so re-run build_membership.py,
-prices/candidates.py and prices/validate.py afterwards.
+Run after prices/validate.py inputs exist (candidates + downloaded
+prices); the links are then used by build_membership.assign_company_ids,
+so re-run build_membership.py, prices/candidates.py and
+prices/validate.py afterwards.
 
 Output: cache/successor_links.parquet
 Usage: python data_pipeline/membership/successors.py
@@ -59,9 +62,12 @@ def succession_filings(ciks) -> pd.DataFrame:
 
 
 def _price_continuity(p_rows: pd.DataFrame, tickers, cache: dict) -> tuple:
-    """Best (ticker, source, n_ok, n_px) of S's tickers against P's implied prices.
+    """Best of S's tickers against P's implied prices.
 
-    A snapshot counts as matched when any of P's share classes matches."""
+    Returns (ticker, source, n_ok, n_px).
+
+    A snapshot counts as matched when any of P's share classes matches.
+    """
     best = (None, None, 0, 0)
     for t in tickers:
         for src in SOURCES:

@@ -11,11 +11,13 @@ class RLScorer:
     """
     Inference wrapper for the trained PPO agent.
 
-    Uses MultiHorizonScorer (LightGBM + CatBoost) to get base predictions,
-    then feeds a compact 8-dim observation to the PPO agent which decides
-    the final position, having learned WHEN and HOW MUCH to act.
+    Uses MultiHorizonScorer (LightGBM + CatBoost) to get base
+    predictions, then feeds a compact 8-dim observation to the PPO agent
+    which decides the final position, having learned WHEN and HOW MUCH
+    to act.
 
-    Falls back gracefully to MultiHorizonScorer if no PPO checkpoint exists.
+    Falls back gracefully to MultiHorizonScorer if no PPO checkpoint
+    exists.
     """
 
     _CKPT = os.path.join(MODEL_DIR, "ppo_agent.zip")
@@ -67,9 +69,11 @@ class RLScorer:
     ) -> dict:
         """
         Returns the same dict structure as MultiHorizonScorer.score().
-        If the PPO checkpoint is loaded, it overrides the position decision.
+        If the PPO checkpoint is loaded, it overrides the position
+        decision.
         """
-        # Always run the base supervised scorer (for predictions + reporting)
+        # Always run the base supervised scorer (for predictions +
+        # reporting)
         result = self._base.score(features)
 
         if self._ppo is None:

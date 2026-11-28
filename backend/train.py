@@ -1,5 +1,6 @@
 """
-Training launcher — run this instead of calling training scripts directly.
+Training launcher — run this instead of calling training scripts
+directly.
 """
 
 import os
@@ -141,8 +142,10 @@ def pick_profile() -> dict | None:
 
 
 def _apply_rolling_window(features):
-    """Filter features to the last ROLLING_WINDOW_YEARS of data before training.
-    Addresses regime non-stationarity — old dynamics hurt recent-period accuracy.
+    """Keep only the last ROLLING_WINDOW_YEARS of data for training.
+
+    Addresses regime non-stationarity: old dynamics hurt recent-period
+    accuracy.
     """
     import pandas as pd
 
@@ -199,7 +202,11 @@ def run_tft(features, profile):
 
 
 def _three_way_split(features):
-    """60/20/20 temporal split — val for model selection, test for final honest eval."""
+    """60/20/20 temporal split.
+
+    Validation for model selection, test for the final honest
+    evaluation.
+    """
     import pandas as pd
 
     from training.tune_hyperparams import three_way_split
@@ -208,7 +215,10 @@ def _three_way_split(features):
 
 
 def _print_comparison_table(results: dict):
-    """Regression metrics: direction accuracy, Spearman IC, MAE for both models."""
+    """Regression metrics of both models.
+
+    Direction accuracy, Spearman IC and MAE.
+    """
     print("\n" + "=" * 84)
     print(
         "  LightGBM vs CatBoost — Regression: predict forward relative return"
@@ -334,7 +344,8 @@ def main():
 
     mode = profile["mode"]
 
-    # RL mode: features already built inside train_rl (no rolling window — needs full history)
+    # RL mode: features already built inside train_rl (no rolling window
+    # — needs full history)
     if mode == "rl":
         from data.feature_engineering import build_features
         from rl.train_rl import train_rl
@@ -361,7 +372,8 @@ def main():
         features = features[features["ticker"].isin(tickers)]
         print(f"  Filtered to {len(features):,} rows\n")
 
-    # Apply rolling window to focus training on recent regime (skipped for TFT — needs sequences)
+    # Apply rolling window to focus training on recent regime (skipped
+    # for TFT — needs sequences)
     if mode in ("lgbm", "catboost", "compare"):
         features = _apply_rolling_window(features)
 

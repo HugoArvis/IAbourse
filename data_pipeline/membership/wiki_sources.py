@@ -10,7 +10,10 @@ HANSHOF_URL = "https://raw.githubusercontent.com/hanshof/sp500_constituents/main
 
 
 def load_hanshof() -> pd.Series:
-    """hanshof/sp500_constituents: Series indexed by date, values = frozenset of tickers."""
+    """hanshof/sp500_constituents as a Series indexed by date.
+
+    Values are frozensets of tickers.
+    """
     if not HANSHOF_CSV.exists():
         import requests
 

@@ -21,8 +21,9 @@ def build_timeseries_dataset(
     features: pd.DataFrame, cutoff_date: str | None = None
 ):
     """
-    Build a pytorch-forecasting TimeSeriesDataSet for 3-class classification.
-    cutoff_date: if set, only use data before this date (walk-forward safe).
+    Build a pytorch-forecasting TimeSeriesDataSet for 3-class
+    classification. cutoff_date: if set, only use data before this date
+    (walk-forward safe).
     """
     from pytorch_forecasting import TimeSeriesDataSet
     from pytorch_forecasting.data.encoders import NaNLabelEncoder
@@ -46,7 +47,8 @@ def build_timeseries_dataset(
         c for c in FEATURE_COLUMNS if c in df.columns and c != "label"
     ]
 
-    # Fill any NaNs in feature columns so the dataset doesn't reject rows
+    # Fill any NaNs in feature columns so the dataset doesn't reject
+    # rows
     df[feat_cols] = df[feat_cols].fillna(0.0)
 
     dataset = TimeSeriesDataSet(
@@ -74,7 +76,8 @@ def build_weighted_train_dataloader(
     """
     Training DataLoader with exponential decay sample weights.
     Sequences ending on more recent dates are sampled more often.
-    Validation DataLoaders should always use the plain to_dataloader(train=False).
+    Validation DataLoaders should always use the plain
+    to_dataloader(train=False).
     """
     half_life = (
         half_life if half_life is not None else TEMPORAL_WEIGHT_HALF_LIFE
@@ -86,9 +89,10 @@ def build_weighted_train_dataloader(
             train=True, batch_size=batch_size, num_workers=0
         )
 
-    # dataset.index is a DataFrame where each row = one training sequence.
-    # time_idx corresponds to the *start* of the encoder window; adding
-    # max_encoder_length gives the approximate end (= prediction target date).
+    # dataset.index is a DataFrame where each row = one training
+    # sequence. time_idx corresponds to the *start* of the encoder
+    # window; adding max_encoder_length gives the approximate end (=
+    # prediction target date).
     idx_series = dataset.index["time"]
     end_idx = idx_series + dataset.max_encoder_length  # recency proxy
     max_end = end_idx.max()
@@ -111,7 +115,10 @@ def build_weighted_train_dataloader(
 
 
 def build_inference_dataloader(features: pd.DataFrame, batch_size: int = 1):
-    """Build a single-sample dataloader for live inference on the latest window."""
+    """Dataloader of the latest window, for live inference.
+
+    Single sample.
+    """
     dataset = build_timeseries_dataset(features)
     return dataset.to_dataloader(
         train=False, batch_size=batch_size, num_workers=0

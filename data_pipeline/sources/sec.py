@@ -1,6 +1,7 @@
 """Minimal SEC EDGAR client with on-disk cache and rate limiting.
 
-SEC fair-access policy: at most 10 requests/second and a declared User-Agent.
+SEC fair-access policy: at most 10 requests/second and a declared
+User-Agent.
 """
 
 import hashlib
@@ -72,11 +73,15 @@ def archive_url(cik: int, accession: str, document: str) -> str:
 
 
 def trading_symbols(cik: int, max_filings: int = 6) -> set[str]:
-    """Tickers the issuer itself declared (dei:TradingSymbol) in its XBRL periodic reports.
+    """Tickers declared by the issuer in its XBRL reports.
 
-    Read from the SEC rendering of the cover page (R1.htm), on up to `max_filings`
-    reports spread over the entity's history. XBRL started in 2009-2011 and the field
-    is optional, so older or smaller filers often return nothing."""
+    Field dei:TradingSymbol of the periodic reports.
+
+    Read from the SEC rendering of the cover page (R1.htm), on up to
+    `max_filings` reports spread over the entity's history. XBRL started
+    in 2009-2011 and the field is optional, so older or smaller filers
+    often return nothing.
+    """
     import re
 
     f = filings(cik)

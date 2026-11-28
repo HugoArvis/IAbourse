@@ -24,11 +24,11 @@ _HORIZON_MAP = {
 class LGBMModel:
     """
     LightGBM regressor predicting forward relative return vs SP500.
-    Positive output = stock expected to outperform SP500 over the horizon.
-    Negative output = expected underperformance.
+    Positive output = stock expected to outperform SP500 over the
+    horizon. Negative output = expected underperformance.
 
-    Position sizing is handled by strategy_scorer.py using the raw return value.
-    horizon: "5d" (weekly), "21d" (monthly, primary)
+    Position sizing is handled by strategy_scorer.py using the raw
+    return value. horizon: "5d" (weekly), "21d" (monthly, primary)
     """
 
     def __init__(self, model=None, horizon: str = "5d"):
@@ -148,8 +148,10 @@ class LGBMModel:
             return None
 
     def predict_latest(self, features: pd.DataFrame) -> float:
-        """Return predicted forward relative return for the most recent row.
-        Positive = expected outperformance vs SP500, negative = underperformance.
+        """Predicted forward relative return of the most recent row.
+
+        Positive = expected outperformance vs SP500, negative =
+        underperformance.
         """
         if self._model is None:
             return 0.0
@@ -166,7 +168,10 @@ class LGBMModel:
             return 0.0
 
     def evaluate(self, features: pd.DataFrame) -> dict:
-        """Direction accuracy, Spearman IC, MAE and RMSE on a provided DataFrame."""
+        """Direction accuracy, IC, MAE and RMSE on a DataFrame.
+
+        IC = Spearman rank correlation.
+        """
         if self._model is None:
             return {}
         try:

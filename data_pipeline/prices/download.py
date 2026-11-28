@@ -1,7 +1,10 @@
-"""Download daily prices for all candidate tickers, cached per ticker and source.
+"""Download daily prices of all candidate tickers.
 
-Sources: yfinance (no strict quota, few delisted tickers) and Tiingo (more delisted
-tickers, free quota ~50 requests/hour). Both are stored with the same schema:
+Cached per ticker and source.
+
+Sources: yfinance (no strict quota, few delisted tickers) and Tiingo
+(more delisted tickers, free quota ~50 requests/hour). Both are stored
+with the same schema:
   open, high, low, close   split-adjusted, NOT dividend-adjusted
   adj_close                split- and dividend-adjusted (total return series)
   volume, dividends, splits
@@ -80,7 +83,8 @@ def download(tickers: list[str]) -> None:
                 )
                 df.index.name = "date"
                 if len(df) <= MIN_ROWS:
-                    # truncated answer (seen under rate limiting): retry next run
+                    # truncated answer (seen under rate limiting): retry
+                    # next run
                     continue
             # empty frame = "no data" marker, avoids re-asking
             df.to_parquet(_path(t))
@@ -90,10 +94,13 @@ def download(tickers: list[str]) -> None:
 
 
 def download_tiingo(ticker: str) -> bool:
-    """Fetch one ticker from Tiingo into the common schema. Returns False if no data.
+    """Fetch one ticker from Tiingo into the common schema.
 
-    Tiingo gives raw prices plus splitFactor; convert to split-adjusted OHLC like yfinance.
-    Raises tiingo.RateLimited when the free quota is exhausted (nothing is written then).
+    Returns False if no data.
+
+    Tiingo gives raw prices plus splitFactor; convert to split-adjusted
+    OHLC like yfinance. Raises tiingo.RateLimited when the free quota is
+    exhausted (nothing is written then).
     """
     path = _path(ticker, "tiingo")
     if path.exists():
@@ -126,7 +133,10 @@ def download_tiingo(ticker: str) -> bool:
 
 
 def load(ticker: str, source: str = "yfinance") -> pd.DataFrame:
-    """Daily prices; drops today's row (session possibly not closed yet)."""
+    """Daily prices, without today's row.
+
+    Today's session may not be closed yet.
+    """
     path = _path(ticker, source)
     if not path.exists():
         return pd.DataFrame()

@@ -1,4 +1,6 @@
-"""Minimal Tiingo client (end-of-day prices and ticker metadata) with on-disk cache.
+"""Minimal Tiingo client with on-disk cache.
+
+End-of-day prices and ticker metadata.
 
 API key: TIINGO_API_KEY in backend/.env (never committed).
 """
@@ -14,7 +16,8 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = Path(__file__).resolve().parents[1] / "cache" / "tiingo"
 BASE = "https://api.tiingo.com/tiingo/daily"
-# seconds between requests (free plan limits are not published per endpoint)
+# seconds between requests (free plan limits are not published per
+# endpoint)
 MIN_INTERVAL = 1.5
 
 load_dotenv(ROOT / "backend" / ".env")
@@ -23,7 +26,10 @@ _last_call = 0.0
 
 
 class RateLimited(RuntimeError):
-    """Free plan quota reached (observed: ~50 requests/hour). Retry later; cache keeps progress."""
+    """Free plan quota reached (observed: ~50 requests/hour).
+
+    Retry later; the cache keeps progress.
+    """
 
 
 def _get(url: str, params: dict | None = None):
@@ -50,8 +56,11 @@ def _get(url: str, params: dict | None = None):
 
 
 def meta(ticker: str) -> dict | None:
-    """Ticker metadata (name, startDate, endDate...). Known but price-less tickers
-    (e.g. delisted ones) still return a name. Cached forever."""
+    """Ticker metadata (name, startDate, endDate...).
+
+    Known but price-less tickers (e.g. delisted ones) still return a
+    name. Cached forever.
+    """
     path = CACHE / "meta" / f"{ticker.upper()}.json"
     if path.exists():
         return json.loads(path.read_text())
@@ -64,7 +73,10 @@ def meta(ticker: str) -> dict | None:
 def prices(
     ticker: str, start: str = "1990-01-01", end: str | None = None
 ) -> list[dict]:
-    """Daily OHLCV with adjusted fields. Cached per ticker (re-download to refresh)."""
+    """Daily OHLCV with adjusted fields.
+
+    Cached per ticker (re-download to refresh).
+    """
     path = CACHE / "prices" / f"{ticker.upper()}.json"
     if path.exists():
         return json.loads(path.read_text())

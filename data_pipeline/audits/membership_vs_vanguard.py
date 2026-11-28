@@ -1,10 +1,12 @@
-"""Validate the Wikipedia-derived membership sources against Vanguard 500 holdings.
+"""Check the Wikipedia-derived membership against Vanguard holdings.
 
-Vanguard 500 Index Fund holdings (SEC filings) are the reference. Everything is
-compared in CIK space so that ticker changes and reuse do not create false gaps.
+Vanguard 500 Index Fund holdings (SEC filings) are the reference.
+Everything is compared in CIK space so that ticker changes and reuse do
+not create false gaps.
 
 Prerequisites (cached by membership/ modules):
-  cache/vanguard500_snapshots.parquet, cache/vanguard500_name_cik.parquet
+  cache/vanguard500_snapshots.parquet,
+  cache/vanguard500_name_cik.parquet
 Usage: python data_pipeline/audits/membership_vs_vanguard.py
 """
 

@@ -1,12 +1,15 @@
 """Ticker -> CIK mapping for the Wikipedia-derived membership sources.
 
 Layers, most reliable first:
-  1. SEC company_tickers.json: official mapping for currently listed tickers.
+  1. SEC company_tickers.json: official mapping for currently listed
+     tickers.
   2. index-constitution former members: name -> CIK within their membership period.
-  3. Remaining historical tickers (hanshof): company names from the Wikipedia changes
+  3. Remaining historical tickers (hanshof): company names from the
+     Wikipedia changes
      table and from Tiingo metadata (both tried), then name -> CIK within the period the ticker
-     was in the index. Tiingo names the *current* holder of a reused ticker; the
-     period constraint rejects those (the CIK must file annual reports at the time).
+     was in the index. Tiingo names the *current* holder of a reused
+     ticker; the period constraint rejects those (the CIK must file
+     annual reports at the time).
 """
 
 import json
@@ -35,7 +38,8 @@ def sec_current_tickers() -> dict[str, int]:
 
 
 def ic_with_cik() -> pd.DataFrame:
-    """index-constitution history with a CIK per row (layers 1 and 2)."""
+    """index-constitution history with a CIK per row (layers 1 and 2).
+    """
     hist = ic.history("sp500").copy()
     current = sec_current_tickers()
     active = hist["opt-out"].isna()
@@ -60,7 +64,8 @@ def ic_with_cik() -> pd.DataFrame:
 
 
 def wikipedia_change_names() -> dict[str, str]:
-    """Ticker -> security name from Wikipedia's 'Historical components' changes table."""
+    """Ticker -> security name from Wikipedia's 'Historical components' changes table.
+    """
     if not WIKI_CHANGES_HTML.exists():
         return {}
     ch = pd.read_html(StringIO(WIKI_CHANGES_HTML.read_text()))[0]
@@ -79,8 +84,9 @@ def ticker_to_cik(
 ) -> dict[str, int]:
     """Ticker -> CIK.
 
-    `ticker_periods` (columns ticker, first, last) lists extra historical tickers to
-    resolve with layer 3, e.g. every ticker that appears in hanshof.
+    `ticker_periods` (columns ticker, first, last) lists extra
+    historical tickers to resolve with layer 3, e.g. every ticker that
+    appears in hanshof.
     """
     mapping = sec_current_tickers()
     former = ic_hist[ic_hist["opt-out"].notna() & ic_hist["cik"].notna()]
@@ -106,11 +112,15 @@ def ticker_to_cik(
 def historical_ticker_names(
     ticker_periods: pd.DataFrame, fetch: bool = True
 ) -> pd.DataFrame:
-    """Company names of historical tickers (columns ticker, first, last).
+    """Company names of historical tickers.
 
-    Both sources are kept, Wikipedia first (pref 0): its wording sometimes fails to
-    match EDGAR ("Interpublic Group of Companies") where Tiingo's (pref 1) matches.
-    Tiingo names are fetched when missing from cache, unless fetch=False."""
+    `ticker_periods` has columns ticker, first, last.
+
+    Both sources are kept, Wikipedia first (pref 0): its wording
+    sometimes fails to match EDGAR ("Interpublic Group of Companies")
+    where Tiingo's (pref 1) matches. Tiingo names are fetched when
+    missing from cache, unless fetch=False.
+    """
     wiki = wikipedia_change_names()
     rows = []
     for t, first, last in zip(
@@ -143,7 +153,10 @@ def historical_ticker_names(
 
 
 def _tiingo_name(ticker: str, fetch: bool) -> str | None | bool:
-    """Company name from Tiingo metadata (cached; fetched if allowed). False = quota reached."""
+    """Company name from Tiingo metadata.
+
+    Cached; fetched if allowed. False = quota reached.
+    """
     cached = tiingo.CACHE / "meta" / f"{ticker.replace('.', '-').upper()}.json"
     if cached.exists():
         return (json.loads(cached.read_text()) or {}).get("name")

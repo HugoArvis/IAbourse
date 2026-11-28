@@ -2,8 +2,8 @@
 
 Steps: normalise names -> exact lookup in SEC cik-lookup-data (current and former
 names) -> fuzzy fallback. When several CIKs share a name, keep the one that files
-annual reports (10-K / 20-F / 40-F), i.e. the operating company, not a trust or
-a debt vehicle with a similar name.
+annual reports (10-K / 20-F / 40-F), i.e. the operating company, not a
+trust or a debt vehicle with a similar name.
 """
 
 import json
@@ -94,12 +94,15 @@ def _pick(
     first_seen: pd.Timestamp,
     last_seen: pd.Timestamp,
 ) -> int | None:
-    """Among candidate CIKs, the operating company active while the name was held.
+    """Pick the candidate CIK active while the name was held.
 
-    Activity window = [first annual report - 15 months, last annual report + 15 months].
-    Among active candidates, prefer the one whose full EDGAR name (legal suffix
-    included: Corp vs Ltd) is closest to `name`, then the longest overlap, then the
-    number of annual reports filed inside the holding period, then in total.
+    The operating company is preferred.
+
+    Activity window = [first annual report - 15 months, last annual
+    report + 15 months]. Among active candidates, prefer the one whose
+    full EDGAR name (legal suffix included: Corp vs Ltd) is closest to
+    `name`, then the longest overlap, then the number of annual reports
+    filed inside the holding period, then in total.
     """
     margin = pd.DateOffset(months=15)
     simple = _simple(name)
@@ -123,14 +126,18 @@ def _pick(
         active.append((cik, sim, overlap, inside, len(dates)))
     if not active:
         return None
-    # Only a clear name difference decides: candidates within 10 points of the best are tied.
+    # Only a clear name difference decides: candidates within 10 points
+    # of the best are tied.
     top_sim = max(a[1] for a in active)
     tied = [a for a in active if a[1] >= top_sim - 10]
     return max(tied, key=lambda a: (a[2], a[3], a[4]))[0]
 
 
 def _simple(name: str) -> str:
-    """Uppercase alphanumerics only, legal suffixes kept (used to compare full names)."""
+    """Uppercase alphanumerics only, legal suffixes kept.
+
+    Used to compare full names.
+    """
     s = re.sub(r"\([^)]*\)|/.*$", " ", name.upper().replace("&", " AND "))
     s = re.sub(r"\bCORPORATION\b", "CORP", s)
     s = re.sub(r"\bINCORPORATED\b", "INC", s)
@@ -145,8 +152,9 @@ def match_names(
 ) -> pd.DataFrame:
     """Map names to CIK.
 
-    `names` has columns name, first_seen, last_seen (period the name was observed).
-    Returns those columns plus cik, method ('exact' / 'fuzzy' / None), matched_key.
+    `names` has columns name, first_seen, last_seen (period the name was
+    observed). Returns those columns plus cik, method ('exact' / 'fuzzy'
+    / None), matched_key.
     """
     lk = _lookup()
     by_key = (

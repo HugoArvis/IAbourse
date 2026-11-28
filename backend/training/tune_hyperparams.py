@@ -1,7 +1,8 @@
 """
 Hyperparameter tuning with Optuna.
 Uses a 60/20/20 temporal split: train → val (Optuna objective) → test (final report).
-Best params saved as JSON in MODEL_DIR and auto-loaded by LGBMModel / CatBoostModel.
+Best params saved as JSON in MODEL_DIR and auto-loaded by LGBMModel /
+CatBoostModel.
 
 Usage:
     py training/tune_hyperparams.py
@@ -31,7 +32,7 @@ from data.feature_engineering import (  # noqa: E402
 _REGRESSION_TARGETS = {"5d": "relative_return", "21d": "relative_return_21d"}
 
 
-# ── Shared helpers ────────────────────────────────────────────────────────────
+# ── Shared helpers ────────────────────────────────────────────────────
 
 
 def three_way_split(
@@ -49,7 +50,8 @@ def three_way_split(
 
 
 def _compute_weights(df: pd.DataFrame) -> np.ndarray:
-    """Same temporal decay + crisis oversampling used in model.train()."""
+    """Same temporal decay + crisis oversampling used in model.train().
+    """
     weights = np.ones(len(df), dtype=np.float32)
     if TEMPORAL_WEIGHT_HALF_LIFE is not None:
         dates = pd.to_datetime(df.index).to_series()
@@ -79,7 +81,7 @@ def load_best_params(model_name: str, horizon: str) -> dict | None:
         return json.load(f)
 
 
-# ── LightGBM tuning ───────────────────────────────────────────────────────────
+# ── LightGBM tuning ───────────────────────────────────────────────────
 
 
 def tune_lgbm(
@@ -89,8 +91,9 @@ def tune_lgbm(
     n_trials: int = 40,
 ) -> dict:
     """
-    Optuna study for LightGBM. Uses early stopping to find optimal n_estimators.
-    Objective: macro-F1 on the validation set (unweighted — real-world performance).
+    Optuna study for LightGBM. Uses early stopping to find optimal
+    n_estimators. Objective: macro-F1 on the validation set (unweighted
+    — real-world performance).
     """
     import lightgbm as lgb
     import optuna
@@ -147,7 +150,8 @@ def tune_lgbm(
         )
         trial.set_user_attr("best_iteration", model.best_iteration_)
         preds = model.predict(X_val)
-        # Spearman IC: rank correlation between predicted and actual returns
+        # Spearman IC: rank correlation between predicted and actual
+        # returns
         from scipy import stats
 
         ic, _ = stats.spearmanr(preds, y_val)
@@ -171,7 +175,7 @@ def tune_lgbm(
     return best
 
 
-# ── CatBoost tuning ───────────────────────────────────────────────────────────
+# ── CatBoost tuning ───────────────────────────────────────────────────
 
 
 def tune_catboost(
@@ -250,7 +254,7 @@ def tune_catboost(
     return best
 
 
-# ── Full tuning pipeline ──────────────────────────────────────────────────────
+# ── Full tuning pipeline ──────────────────────────────────────────────
 
 
 def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
@@ -258,7 +262,8 @@ def run_tuning(features: pd.DataFrame, n_lgbm: int = 40, n_catboost: int = 25):
     Full pipeline:
       1. 60/20/20 temporal split
       2. Optuna: tune LightGBM and CatBoost on train→val
-      3. Save best params as JSON (auto-loaded by model.train() from now on)
+      3. Save best params as JSON (auto-loaded by model.train() from now
+         on)
       4. Retrain final models on train+val with best params
       5. Report test-set accuracy for both models, both horizons
     """

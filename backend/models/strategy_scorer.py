@@ -36,13 +36,16 @@ def _strategy_text(ret: float, confidence: float, stress: float) -> str:
 
 class MultiHorizonScorer:
     """
-    Fuses 5d and 21d regression predictions into a single position signal.
+    Fuses 5d and 21d regression predictions into a single position
+    signal.
 
     The model outputs predicted forward relative return vs SP500.
-    Position is scaled linearly to MAX_PREDICTED_RETURN (±100% at ±3% alpha).
+    Position is scaled linearly to MAX_PREDICTED_RETURN (±100% at ±3%
+    alpha).
 
     Fusion:
-    - 21d dominates (90%) — 5d near-random on recent data (31% direction accuracy)
+    - 21d dominates (90%) — 5d near-random on recent data (31% direction
+      accuracy)
     - In stress regimes, position is reduced by up to 50%
     - Signals below the confidence threshold produce zero position
     """
@@ -55,8 +58,9 @@ class MultiHorizonScorer:
         from models.catboost_model import CatBoostModel
         from models.lgbm_model import LGBMModel
 
-        # 5d: CatBoost (IC 0.046, better rank signal — but direction acc ~50%, 5% weight only)
-        # 21d: LightGBM (IC 0.123, direction acc 55.4% — primary decision driver)
+        # 5d: CatBoost (IC 0.046, better rank signal — but direction acc
+        # ~50%, 5% weight only) 21d: LightGBM (IC 0.123, direction acc
+        # 55.4% — primary decision driver)
         self._model_5d = CatBoostModel.load_latest(horizon="5d")
         self._model_21d = LGBMModel.load_latest(horizon="21d")
         loaded = sum(m is not None for m in [self._model_5d, self._model_21d])
@@ -100,7 +104,8 @@ class MultiHorizonScorer:
         w21 = 1.0 - w5
         ret = w5 * ret_5d + w21 * ret_21d
 
-        # --- position sizing: linear scale, capped at ±MAX_PREDICTED_RETURN ---
+        # --- position sizing: linear scale, capped at
+        # ±MAX_PREDICTED_RETURN ---
         raw_position = float(np.clip(ret / MAX_PREDICTED_RETURN, -1.0, 1.0))
 
         # Confidence = normalised signal strength (0→1)

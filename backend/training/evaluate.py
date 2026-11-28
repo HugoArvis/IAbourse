@@ -30,8 +30,9 @@ _TARGET = {"1d": "label_1d", "5d": "label", "21d": "label_21d"}
 def _train_fold(df: pd.DataFrame, horizon: str):
     """
     Lightweight LightGBM fit for a single walk-forward fold.
-    Uses fixed n_estimators — no early stopping so small folds don't fail.
-    Features are filled with 0 for NaN (only target NaNs are dropped).
+    Uses fixed n_estimators — no early stopping so small folds don't
+    fail. Features are filled with 0 for NaN (only target NaNs are
+    dropped).
     """
     import lightgbm as lgb
 
@@ -74,13 +75,14 @@ def _train_fold(df: pd.DataFrame, horizon: str):
     return model, target_col
 
 
-# ── Regime-aware metrics ─────────────────────────────────────────────────────
+# ── Regime-aware metrics ──────────────────────────────────────────────
 
 
 def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
     """
     SELL recall during crash windows  — did the model warn before/during crashes?
-    BUY recall during recovery windows — did the model catch the rebounds?
+    BUY recall during recovery windows — did the model catch the
+    rebounds?
     """
     from sklearn.metrics import recall_score
 
@@ -146,7 +148,7 @@ def _regime_metrics(preds: pd.Series, labels: pd.Series) -> dict:
     return results
 
 
-# ── Walk-forward evaluation ───────────────────────────────────────────────────
+# ── Walk-forward evaluation ───────────────────────────────────────────
 
 
 def walk_forward_evaluate(
@@ -224,10 +226,11 @@ def walk_forward_evaluate(
     macro_f1 = report["macro avg"]["f1-score"]
     active_precision = (sell_prec + buy_prec) / 2.0
 
-    # Exit criterion: directional signals must be meaningfully better than random
-    #   active_precision ≥ 0.40  — SELL/BUY calls correct >40% of the time (random baseline ~33%)
-    #   macro_f1         ≥ 0.35  — balanced performance across all three classes
-    #   kappa            ≥ 0.10  — non-trivial agreement beyond chance
+    # Exit criterion: directional signals must be meaningfully better
+    # than random
+    #     active_precision ≥ 0.40  — SELL/BUY calls correct >40% of the time (random baseline ~33%)
+    #     macro_f1         ≥ 0.35  — balanced performance across all three classes
+    #     kappa            ≥ 0.10  — non-trivial agreement beyond chance
     passed = active_precision >= 0.40 and macro_f1 >= 0.35 and kappa >= 0.10
 
     logger.info(
@@ -252,7 +255,7 @@ def walk_forward_evaluate(
     }
 
 
-# ── Crisis stress test ────────────────────────────────────────────────────────
+# ── Crisis stress test ────────────────────────────────────────────────
 
 CRISIS_START = "2020-02-01"
 CRISIS_END = "2020-04-30"

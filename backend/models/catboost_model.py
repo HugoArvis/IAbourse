@@ -29,7 +29,8 @@ class CatBoostModel:
     """
     CatBoost regressor predicting forward relative return vs SP500.
     Same predict_latest() / evaluate() interface as LGBMModel.
-    Positive output = expected outperformance, negative = underperformance.
+    Positive output = expected outperformance, negative =
+    underperformance.
     """
 
     def __init__(self, model=None, horizon: str = "5d"):
@@ -151,7 +152,7 @@ class CatBoostModel:
             return None
 
     def predict_latest(self, features: pd.DataFrame) -> float:
-        """Return predicted forward relative return for the most recent row."""
+        """Predicted forward relative return of the most recent row."""
         if self._model is None:
             return 0.0
         try:
@@ -162,7 +163,10 @@ class CatBoostModel:
             return 0.0
 
     def evaluate(self, features: pd.DataFrame) -> dict:
-        """Direction accuracy, Spearman IC, MAE and RMSE on a provided DataFrame."""
+        """Direction accuracy, IC, MAE and RMSE on a DataFrame.
+
+        IC = Spearman rank correlation.
+        """
         if self._model is None:
             return {}
         try:

@@ -49,7 +49,10 @@ def _daily_job():
 
 
 def _weekly_retrain_job():
-    """Sunday evening retraining — keeps models calibrated to the current regime."""
+    """Sunday evening retraining.
+
+    Keeps the models calibrated to the current regime.
+    """
     logger.info("Weekly retraining job started")
     try:
         from data.feature_engineering import build_features

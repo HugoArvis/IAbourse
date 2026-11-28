@@ -23,7 +23,10 @@ from data.feature_engineering import FEATURE_COLUMNS
 
 
 class WeightedCrossEntropy(CrossEntropy):
-    """CrossEntropy with per-class weights to prevent HOLD-class collapse."""
+    """Cross-entropy with per-class weights.
+
+    The weights prevent HOLD-class collapse.
+    """
 
     def __init__(self, class_weights: dict):
         super().__init__()
@@ -47,7 +50,8 @@ class WeightedCrossEntropy(CrossEntropy):
 class TFTModel:
     """
     Wrapper around pytorch-forecasting's TemporalFusionTransformer.
-    Provides a stable interface for training, saving, loading, and inference.
+    Provides a stable interface for training, saving, loading, and
+    inference.
     """
 
     def __init__(self, model=None):
@@ -80,8 +84,9 @@ class TFTModel:
         os.makedirs(MODEL_DIR, exist_ok=True)
         if path is None:
             path = os.path.join(MODEL_DIR, "tft_latest.ckpt")
-        # ModelCheckpoint already saved proper Lightning checkpoints for each fold.
-        # Copy the most recent fold checkpoint so load_from_checkpoint works correctly.
+        # ModelCheckpoint already saved proper Lightning checkpoints for
+        # each fold. Copy the most recent fold checkpoint so
+        # load_from_checkpoint works correctly.
         fold_ckpts = glob.glob(os.path.join(MODEL_DIR, "tft_fold*.ckpt"))
         if fold_ckpts:
             best = max(fold_ckpts, key=os.path.getmtime)
@@ -91,7 +96,8 @@ class TFTModel:
                 f" {os.path.basename(best)})"
             )
         elif self._model is not None:
-            # Fallback: save Lightning checkpoint via the model's internal method
+            # Fallback: save Lightning checkpoint via the model's
+            # internal method
             (
                 self._model.trainer.save_checkpoint(path)
                 if hasattr(self._model, "trainer") and self._model.trainer
@@ -151,8 +157,9 @@ class TFTModel:
     ) -> tuple[float, float, float]:
         """
         Run inference and return (p_sell, p_hold, p_buy).
-        If multiple fold models are loaded, averages their probability distributions
-        before computing the final score — ensemble reduces prediction variance.
+        If multiple fold models are loaded, averages their probability
+        distributions before computing the final score — ensemble
+        reduces prediction variance.
         """
         if self._model is None:
             logger.error("Model not loaded")

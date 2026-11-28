@@ -12,13 +12,15 @@ class TradingEnv(gym.Env):
     """
     Multi-ticker trading environment for PPO fine-tuning.
 
-    Observation (8 dims) — compact vector derived from supervised model predictions:
+    Observation (8 dims) — compact vector derived from supervised model
+    predictions:
       [pred_5d_norm, pred_21d_norm, confidence, vix_z_norm,
        mkt_drawdown_norm, stress, current_position, episode_drawdown]
 
-    Using the compact representation (vs raw 60-day feature window) because
-    LightGBM/CatBoost already compress the full window into a single alpha estimate.
-    The RL agent learns WHEN and HOW MUCH to act on those predictions.
+    Using the compact representation (vs raw 60-day feature window)
+    because LightGBM/CatBoost already compress the full window into a
+    single alpha estimate. The RL agent learns WHEN and HOW MUCH to act
+    on those predictions.
 
     Action (1 dim): target position in [-1, 1] → maps to -100% to +100% of portfolio.
     """
@@ -99,7 +101,8 @@ class TradingEnv(gym.Env):
         c1 = float(self._df.iloc[safe].get("close", c0))
         daily_ret = (c1 / c0 - 1.0) if c0 > 0 else 0.0
 
-        # Portfolio update: use old position for today's return, then move to new position
+        # Portfolio update: use old position for today's return, then
+        # move to new position
         tx_cost = delta * 0.001
         pf_ret = self._position * daily_ret - tx_cost
         self._position = new_pos

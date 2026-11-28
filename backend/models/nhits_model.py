@@ -18,7 +18,10 @@ from models.tft_model import WeightedCrossEntropy
 
 
 class NHiTSModel:
-    """N-HiTS wrapper — same interface as TFTModel for drop-in comparison."""
+    """N-HiTS wrapper with the same interface as TFTModel.
+
+    Drop-in replacement for comparison.
+    """
 
     def __init__(self, model=None):
         self._model = model

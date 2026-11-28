@@ -38,7 +38,8 @@ def fetch_news_for_ticker(
 ) -> pd.DataFrame:
     """
     Fetch recent news, run FinBERT, return daily aggregated sentiment.
-    Cutoff: only articles before 09:30 NY of each day (data leakage rule).
+    Cutoff: only articles before 09:30 NY of each day (data leakage
+    rule).
     """
     end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days_back)
@@ -83,7 +84,8 @@ def fetch_news_for_ticker(
         df["sentiment_neu"] = 0.334
         df["compound"] = 0.0
 
-    # Aggregate to daily — only articles before 09:30 NY count for that day
+    # Aggregate to daily — only articles before 09:30 NY count for that
+    # day
     from zoneinfo import ZoneInfo
 
     ny = ZoneInfo("America/New_York")

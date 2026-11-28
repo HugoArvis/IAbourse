@@ -1,8 +1,10 @@
 """Compare two free sources of historical S&P 500 membership.
 
 Sources:
-  - hanshof/sp500_constituents: one row per date with the full member list.
-  - index-constitution (PyPI): one row per company with opt-in / opt-out dates.
+  - hanshof/sp500_constituents: one row per date with the full member
+    list.
+  - index-constitution (PyPI): one row per company with opt-in / opt-out
+    dates.
 
 Usage: python data_pipeline/audits/membership_audit.py
 """

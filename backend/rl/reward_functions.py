@@ -10,8 +10,8 @@ def compute_reward(
     is_terminal: bool = False,
 ) -> float:
     """
-    r = sharpe_incremental - 2.0 * drawdown_penalty - 0.5 * transaction_cost
-    terminal bonus = sharpe_ratio_episode * 10
+    r = sharpe_incremental - 2.0 * drawdown_penalty - 0.5 *
+    transaction_cost terminal bonus = sharpe_ratio_episode * 10
     """
     sharpe_inc = _sharpe_incremental(returns_history)
     drawdown_penalty = max(0.0, current_drawdown - DRAWDOWN_PENALTY_THRESHOLD)

@@ -10,7 +10,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 def build_callbacks(make_env_fn, log_path: str = "models/eval_logs/"):
     eval_env = DummyVecEnv([make_env_fn])
 
-    # Episode reward ~20 corresponds to Sharpe ≈ 1.0 (10 from incremental + 10 terminal bonus)
+    # Episode reward ~20 corresponds to Sharpe ≈ 1.0 (10 from
+    # incremental + 10 terminal bonus)
     stop = StopTrainingOnRewardThreshold(reward_threshold=20.0, verbose=1)
 
     eval_cb = EvalCallback(
